@@ -159,6 +159,32 @@ fn core_lines(s: &Snap, width: usize, gutter: usize) -> Vec<Out> {
     out
 }
 
+/// Like `render`, but at most `max_lines` tall (for a terminal screen): fewer children
+/// per parent first (the path to the busiest processes is always kept), then fewer
+/// levels. `--all` is never folded.
+pub fn render_fit(s: &Snap, o: &Opts, head: &Headline, width: usize, max_lines: usize) -> Vec<Line> {
+    let full = render(s, o, head, width);
+    if o.all || full.len() <= max_lines {
+        return full;
+    }
+    let mut f = o.clone();
+    loop {
+        if f.top > 1 {
+            f.top -= 1;
+        } else if f.depth > 1 {
+            f.depth -= 1;
+        } else {
+            let mut l = render(s, &f, head, width);
+            l.truncate(max_lines);
+            return l;
+        }
+        let l = render(s, &f, head, width);
+        if l.len() <= max_lines {
+            return l;
+        }
+    }
+}
+
 pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     let mut vm_path = vec![];
     let mut at = s.vm_host;
