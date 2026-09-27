@@ -1,6 +1,6 @@
 # gputree
 
-![gputree: the tree draws in 27 ms, then Jev writes the headline, then -w .5 goes live](assets/launch/gputree-readme.gif)
+![gputree: first frame in 21 ms, then Jev's plain-English headline, with its key phrases traced back to the rows that prove them](assets/launch/gputree-readme.gif)
 
 What is using your GPUs, as a tree — adapter, then process, then engine, and
 for WSL2 the Linux processes inside the VM — with one plain-English sentence on

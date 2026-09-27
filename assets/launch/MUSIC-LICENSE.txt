@@ -17,6 +17,7 @@ CC0 1.0 summary (from https://creativecommons.org/publicdomain/zero/1.0/):
   allowed by law. You can copy, modify, distribute and perform the work, even for
   commercial purposes, all without asking permission. No attribution required.
 
-Edit used: 85.12 s - 109.12 s of the track (24 s), measured at 107.7 BPM;
+Edit used: 85.12 s - 113.12 s of the track (28 s, v2 video; v1 used 24 s),
+measured at 107.7 BPM;
 a low-pass filter during the "offline" beat, fades in/out, loudness-normalised
 to -14 LUFS integrated.
