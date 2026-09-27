@@ -87,6 +87,7 @@ struct Rules {
     recording: Regex,
     cad: Regex,
     gamedev: Regex,
+    gamename: Regex,
     gamepath: Regex,
     launcher: Regex,
     playback: Regex,
@@ -106,7 +107,9 @@ static R: LazyLock<Rules> = LazyLock::new(|| Rules {
     render: re(r"^(ffmpeg|handbrake|adobe premiere pro|premiere|resolve|afterfx|vegas\d*|topaz|shotcut|kdenlive|adobe media encoder|capcut|clipchamp)"),
     recording: re(r"^(obs\d*|streamlabs|nvidia share|gamebar)"),
     cad: re(r"^(blender|maya|3dsmax|cinema 4d|houdini|fusion360|freecad|solidworks|sketchup|rhino|unrealeditor|unity|substance)"),
-    gamedev: re(r"^(godot|megadot)"),
+    gamedev: re(r"^(godot|megadot|robloxstudiobeta)"),
+    // games that do not install under a store's folder
+    gamename: re(r"^(robloxplayerbeta|robloxplayerlauncher|minecraft\.windows|league of legends|valorant-win64-shipping|fortniteclient-win64-shipping)$"),
     gamepath: re(r"steamapps\\common|\\epic games\\|\\xboxgames\\|\\riot games\\|battle\.net|\\ea games\\|\\ubisoft\\|\\gog games\\|\\games\\"),
     launcher: re(r"^(steam|steamwebhelper|epicgameslauncher|battle\.net|riotclientservices|eadesktop|galaxyclient|xboxpcapp)$"),
     playback: re(r"^(vlc|mpv|mpc-hc\d*|video\.ui|microsoft\.media\.player|netflix|potplayer)"),
@@ -146,6 +149,9 @@ pub fn tag(name: &str, path: &str, cmd: &str, eng: Option<&BTreeMap<String, f64>
     }
     if r.gamedev.is_match(&n) {
         return "game dev";
+    }
+    if r.gamename.is_match(&n) || (n == "javaw" && p.contains("minecraft")) {
+        return "game";
     }
     if r.gamepath.is_match(&p) {
         return "game";
@@ -193,4 +199,29 @@ pub fn tag(name: &str, path: &str, cmd: &str, eng: Option<&BTreeMap<String, f64>
         }
     }
     "other"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tag;
+
+    #[test]
+    fn games_outside_store_folders() {
+        assert_eq!(tag("RobloxPlayerBeta", r"C:\Users\u\AppData\Local\Roblox\Versions\v1\RobloxPlayerBeta.exe", "", None), "game");
+        assert_eq!(tag("RobloxPlayerLauncher", "", "", None), "game");
+        assert_eq!(tag("RobloxStudioBeta", "", "", None), "game dev");
+        assert_eq!(tag("Minecraft.Windows", "", "", None), "game");
+        assert_eq!(tag("javaw", r"C:\Users\u\AppData\Roaming\.minecraft\runtime\bin\javaw.exe", "", None), "game");
+        assert_eq!(tag("javaw", r"C:\Program Files\Java\bin\javaw.exe", "", None), "other");
+        assert_eq!(tag("League of Legends", "", "", None), "game");
+        assert_eq!(tag("VALORANT-Win64-Shipping", "", "", None), "game");
+        assert_eq!(tag("FortniteClient-Win64-Shipping", "", "", None), "game");
+    }
+
+    #[test]
+    fn existing_rules_still_hold() {
+        assert_eq!(tag("chrome", "", "", None), "browser");
+        assert_eq!(tag("python", "", "python train.py", None), "training");
+        assert_eq!(tag("dwm", "", "", None), "desktop");
+    }
 }
