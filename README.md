@@ -47,6 +47,9 @@ older PowerShell script (kept in [`legacy/`](legacy/)). The script took about
 10 s; gputree draws its first frame in about 30 ms and is complete in 0.3 s
 (0.5 s with the Jev headline).
 
+Both tools also run natively on **Linux** with the same flags, screens and tags,
+reading DRM fdinfo, NVML and `/proc` instead (see [Linux](#linux)).
+
 **Read-only.** gputree samples performance counters, reads the registry, asks
 NVML, and reads `/proc` inside WSL. It never kills, signals, suspends or
 reprioritizes anything.
@@ -212,6 +215,110 @@ process alone. Rows are sorted by the subtree total, largest first, with
 | `-a`, `--all` | no merging, no limits |
 | `-w`, `--watch N`, `--no-wsl`, `--no-ai`, `--width N`, `--no-color` | as in gputree |
 
+## Linux
+
+`gputree` and `cputree` build and run natively on Linux with the same flags, the same screens and the same tags. Only the data layer is
+different; the model, the renderer, the tags and the Jev call are shared code.
+The GUI windows stay Windows-only and are not built on Linux.
+
+### Install
+
+```sh
+# Rust (user-level) if you do not have it
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+sudo apt install build-essential pkg-config      # a C linker; nothing else is needed
+
+git clone https://github.com/gshklovs/gputree
+cd gputree
+cargo build --release
+install -m 755 target/release/gputree target/release/cputree ~/.local/bin/
+```
+
+No system libraries are linked: NVML (`libnvidia-ml.so.1`) is loaded at run time
+when it exists, and Jev goes through the system `curl`. `cputree` needs no
+privileges. `gputree` sees GPU clients through `/proc/<pid>/fdinfo`, which the
+kernel only shows for your own processes, so run `sudo gputree` to see every
+user's (the same rule as nvtop and intel_gpu_top).
+
+### Data sources on Linux
+
+| what | where from |
+| --- | --- |
+| per-process GPU time and memory (amdgpu, i915, xe, nouveau, panfrost, ...) | DRM fdinfo: every fd pointing at `/dev/dri/card*` or `renderD*`, its `/proc/<pid>/fdinfo/<fd>` read twice ~280 ms apart. `drm-engine-*` busy ns (or xe's `drm-cycles-*` / `drm-total-cycles-*`) over the window, divided by `drm-engine-capacity-*`, is the utilisation; memory is `drm-resident-*`, else `drm-memory-*`, else `drm-total-*` (vram/local regions are dedicated, gtt/system shared). Clients are counted once per `drm-pdev` + `drm-client-id`, under the lowest pid holding them |
+| engine names | mapped to the Windows ones so the tags' hints apply: gfx/render/rcs → `3d`, compute/ccs → `compute`, dec/video/vcs/jpeg → `videodecode`, enc → `videoencode`, copy/sdma/bcs → `copy` |
+| NVIDIA (proprietary driver) per process | NVML: running compute and graphics processes (used memory), `nvmlDeviceGetProcessUtilization` samples since the last collection (SM → `compute` or `3d`, plus enc/dec); `nvidia-smi --query-compute-apps` if the library cannot be loaded. Only asked when an NVIDIA card is awake (`power/runtime_status`), since asking wakes a sleeping laptop dGPU |
+| adapters | `/sys/class/drm/card*/device`: vendor, device, `uevent` (driver, PCI slot), amdgpu's `product_name` and `mem_info_vram_*` / `mem_info_gtt_*`; NVIDIA names and VRAM from NVML; other names from `pci.ids` ("GA106 [GeForce RTX 3060]" → "NVIDIA GeForce RTX 3060"). A GPU without its own VRAM is measured against half of RAM, like Windows' shared GPU memory |
+| NVIDIA temperature and power | NVML, else `nvidia-smi` (as on Windows) |
+| processes, tree, CPU | `/proc/<pid>/stat` (ppid, utime + stime, starttime, RSS, threads) sampled twice ~300 ms apart; the parent must have started before the child (pid-reuse guard); the same roll-up and same-name merging |
+| machine and per-core CPU | `/proc/stat` (iowait counts as idle; irq, softirq and steal as kernel) |
+| memory | `/proc/meminfo` (MemTotal − MemAvailable); per process VmRSS |
+| names | argv[0]'s basename (comm is cut at 15 characters); for an interpreter, the script and its first arguments, like the WSL rows (`train bd1-walk-flat`); kernel threads by comm |
+| CPU temperature | hwmon (`coretemp`, `k10temp`, `zenpower`, `cpu_thermal`), else the `x86_pkg_temp` / `cpu` thermal zone; shown after the user/kernel split when present |
+
+Differences from the Windows screens, all small:
+
+- **cputree** always expands the chain of parents down to the (up to three)
+  processes using at least 1% of the machine, whatever `--depth` says. Linux
+  trees run deep (`systemd → systemd --user → flock → timeout → python`), and
+  without this the busiest process would hide under its wrappers. Kernel
+  threads sit under `kthreadd`, tagged `system`.
+- **Tags** also know the Linux names: Steam's `reaper`, anything under
+  `steamapps/common` (path or command line), Proton and Wine → `game`; Xorg,
+  Xwayland, gnome-shell, KWin, sway, Hyprland → `desktop`; PipeWire and
+  PulseAudio → `audio`; QEMU → `vm`; gnome-terminal, Konsole, kitty, foot and
+  the shells → `terminal`; systemd, kernel threads, `/usr/sbin` daemons and
+  distro daemons written in Python → `system`. The command line is read, so
+  `python train.py` is `training` and `python -m vllm` is `ai inference`.
+- `--no-wsl` does nothing: there is no VM to look into from the inside.
+
+### Inside WSL2 (limited)
+
+WSL has no DRM: the GPU is the paravirtual `/dev/dxg`, and nothing below it
+reports per-process GPU time or memory. gputree says so and shows what can be
+known: the adapter from NVML (else `nvidia-smi`), one `/dev/dxg` row carrying
+the whole GPU's memory and utilisation — Windows' own use included — and under
+it the Linux processes holding `/dev/dxg`, with their RAM. cputree is complete
+inside WSL (it is plain `/proc`).
+
+```
+Your NVIDIA RTX 5060 is 87% busy — almost all of it is a training run (train bd1-walk-flat, WSL).
+gputree  1 adapter · ranked by vram · 15:35:19
+
+NVIDIA GeForce RTX 5060 Laptop GPU  63°C · 42 W
+ mem  ███▉········   2.6 GiB        of 8.0 GiB
+ util ██████████▌·             87%  gpu 87%
+ tags [training] 2.6 GiB 87%
+└──── ████████████   2.6 GiB   87%  /dev/dxg (WSL GPU, whole adapter)           [training]
+   ├─ ██████████▌·             87%  gpu
+   └─                2.7 GiB        train bd1-walk-flat  (microduck_rl)         [training]  pid 1194
+
+Limited view (WSL): per-process GPU use is not visible here. /dev/dxg is the whole GPU (Windows' use
+included); under it, the Linux processes holding it (RAM shown).
+```
+
+```
+CPU is mostly idle (4%); the biggest user is train bd1-walk-flat (4%).
+cputree  24 logical CPUs · 15.3 GiB RAM · ranked by cpu · 15:35:19
+
+ cpu           ▌···········    4%                  user 4% · kernel 0.4%
+ cores         ▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+ mem           ██▊·········               3.5 GiB  of 15.3 GiB (23%)
+ tags          [training] 4% 2.9 GiB
+
+                             Σcpu   own      Σmem  process tree
+└───────────── ▌···········    4%    0%   3.1 GiB  systemd                     [system]    pid 1
+   ├────────── ▌···········    4%    0%   2.8 GiB  systemd ×2                  [system]    2 procs
+   │  ├─────── ▌···········    4%    0%   2.7 GiB  flock                       [training]  pid 1191
+   │  │  └──── ▌···········    4%    0%   2.7 GiB  timeout                     [training]  pid 1193
+   │  │     └─ ▌···········    4%    4%   2.7 GiB  train bd1-walk-flat         [training]  pid 1194
+   │  └─────── ············    0%    0%    10 MiB  (sd-pam) ×2                 [system]    2 procs
+   ├────────── ············  0.1%    0%    44 MiB  init                        [system]    pid 2
+   ...
+```
+
+(The WSL VM gets 24 logical CPUs, so one busy core is 4%.) GPU temperature
+and power come from the host driver through NVML.
+
 ## The windows: gputree-gui and cputree-gui
 
 ![gputree-gui: the NVIDIA GPU's VRAM held by the WSL2 VM and, inside it, the training run; the Intel iGPU's shared memory by process](assets/gputree-gui.png)
@@ -312,6 +419,8 @@ environment variables, full paths or user names. The key goes to Windows' own
 
 ## Data sources
 
+On Windows (for Linux, see [Data sources on Linux](#data-sources-on-linux)):
+
 | what | where from |
 | --- | --- |
 | per-process GPU memory, dedicated and shared | `GPU Process Memory` counters (max per pid + adapter) |
@@ -332,18 +441,30 @@ but through the Perflib V2 consumer API (`PerfOpenQueryHandle`,
 ## Develop
 
 ```sh
-cargo test               # layout (alignment, never wider than the terminal), shortening
+cargo test               # layout (alignment, never wider than the terminal), shortening,
+                         # tags, and the Linux parsers against tests/fixtures
 cargo build --release
 gputree --timing         # phase timings on stderr (cputree too)
 ```
+
+The Linux parsers (fdinfo, `/proc/stat`, `/proc/<pid>/stat`, meminfo, uevent,
+`pci.ids`, NVML-shaped samples) are plain functions over text, compiled on
+every platform, so `cargo test` checks them against the samples in
+[`crates/treecore/tests/fixtures`](crates/treecore/tests/fixtures) on Windows
+too. The fixtures cover the paths no single machine has: amdgpu, i915 (no
+`drm-pdev`, two video engines), xe's cycle counters, a client shared by two
+processes, and NVML per-process samples.
 
 A cargo workspace:
 
 | path | what lives there |
 | --- | --- |
 | `crates/treecore` | the shared library: data collection, tags, Jev, the terminal grid |
-| `crates/treecore/src/gpu/` | GPU counters (Perflib V2), registry, NVML, model, headline, screen |
-| `crates/treecore/src/cpu/` | process snapshot (`NtQuerySystemInformation`), tree + roll-up, WSL CPU sampling, headline, screen |
+| `crates/treecore/src/gpu/` | model, headline, screen, NVML; `drm.rs` the fdinfo / NVML-sample / sysfs parsers |
+| `crates/treecore/src/gpu/sys/` | the platform layer, one interface: `windows.rs` (Perflib V2 counters, registry, Toolhelp32), `linux.rs` (fdinfo scan, sysfs, NVML, `/dev/dxg`) |
+| `crates/treecore/src/cpu/` | tree + roll-up, WSL CPU sampling, headline, screen |
+| `crates/treecore/src/cpu/sys/` | `windows.rs` (`NtQuerySystemInformation`), `linux.rs` (`/proc`, hwmon) |
+| `crates/treecore/src/{procfs,linux}.rs` | `/proc` text parsers (all platforms); Linux-only helpers (clock ticks, local time, name cache) |
 | `crates/treecore/src/layout.rs` | the aligned grid both screens are drawn on |
 | `crates/treecore/src/term.rs` | styled, width-safe lines, bars, in-place redraw |
 | `crates/treecore/src/{tags,jev,wsl}.rs` | tag rules, the Jev call, running scripts inside WSL |

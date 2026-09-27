@@ -10,11 +10,19 @@ pub struct Sample {
     pub procs: Vec<PInfo>,
     pub sys: (i64, i64, i64),
     pub cores: Vec<(i64, i64, i64)>,
+    /// CPU package temperature, °C, where the platform has a cheap source (Linux)
+    pub temp: Option<f64>,
 }
 
 impl Sample {
     pub fn take() -> Sample {
-        Sample { at: Instant::now(), procs: sys::processes(), sys: sys::system_times(), cores: sys::core_times() }
+        Sample {
+            at: Instant::now(),
+            procs: sys::processes(),
+            sys: sys::system_times(),
+            cores: sys::core_times(),
+            temp: sys::cpu_temp(),
+        }
     }
 }
 
@@ -76,6 +84,12 @@ pub struct Snap {
     /// the Linux rows hang under it
     pub vm_host: Option<usize>,
     pub time: String,
+    /// CPU temperature, °C (Linux, when the machine has a sensor)
+    pub temp: Option<f64>,
+    /// the busiest processes, whose parent chains are shown whatever --depth says
+    /// (Linux only: its trees run deep, e.g. systemd -> systemd --user -> flock ->
+    /// timeout -> python; Windows keeps its plain --depth)
+    pub hot: Vec<usize>,
 }
 
 #[derive(Default)]
@@ -94,27 +108,91 @@ pub fn is_vm(name: &str) -> bool {
     n == "vmmem" || n == "vmmemwsl" || n == "vmwp"
 }
 
-/// Windows components the GPU rules call "other" but are plainly the system.
-fn system_ish(name: &str, path: &str) -> bool {
+/// Components the GPU rules call "other" but are plainly the system: Windows' own
+/// services, and on Linux kernel threads (no command line), init / systemd and the
+/// usual daemons, and WSL's plumbing.
+fn system_ish(name: &str, path: &str, cmd: &str) -> bool {
     let p = path.to_ascii_lowercase();
     if p.starts_with(r"c:\windows\") && !p.contains(r"\windowsapps\") {
         return true;
     }
-    matches!(
-        name.to_ascii_lowercase().as_str(),
+    let n = name.to_ascii_lowercase();
+    if matches!(
+        n.as_str(),
         "smss" | "wininit" | "winlogon" | "services" | "lsass" | "svchost" | "fontdrvhost" | "lsaiso" | "memcompression"
             | "secure system" | "spoolsv" | "searchindexer" | "msmpeng" | "wudfhost" | "dashost" | "sihost" | "ctfmon"
             | "taskhostw" | "runtimebroker" | "dllhost" | "conhost" | "securityhealthservice" | "wmiprvse"
-    )
+    ) {
+        return true;
+    }
+    if cfg!(windows) {
+        return false;
+    }
+    // Linux
+    if cmd.is_empty() {
+        return true; // kernel threads (kthreadd, kworker/*, ksoftirqd/*, ...)
+    }
+    let c = cmd.to_ascii_lowercase();
+    let argv0 = c.split_whitespace().next().unwrap_or("");
+    n.starts_with("systemd")
+        || n.starts_with("relay(") // WSL's per-session plumbing
+        || n.starts_with("sessionleader")
+        || n == "(sd-pam)"
+        || argv0.starts_with("/lib/systemd/")
+        || argv0.starts_with("/usr/lib/systemd/")
+        || argv0.starts_with("/usr/sbin/")
+        || argv0.starts_with("/sbin/")
+        || matches!(
+            n.as_str(),
+            "init" | "kthreadd" | "dbus-daemon" | "dbus-broker" | "polkitd" | "udisksd" | "upowerd" | "networkmanager"
+                | "wpa_supplicant" | "rsyslogd" | "cron" | "crond" | "atd" | "snapd" | "sshd" | "containerd" | "dockerd"
+                | "packagekitd" | "accounts-daemon" | "avahi-daemon" | "cupsd" | "thermald" | "irqbalance" | "agetty"
+                | "login" | "gdm" | "sddm" | "lightdm" | "gvfsd" | "tracker-miner-fs-3" | "fwupd" | "multipathd"
+                | "networkd-dispatcher" | "unattended-upgrade-shutdown" | "plan9" | "sessionleader" | "relay" | "gns"
+                | "localhost" | "wslconnect"
+        )
 }
 
-pub fn cpu_tag(name: &str, path: &str) -> &'static str {
-    // shells live in System32 but are not the system
-    if matches!(name.to_ascii_lowercase().as_str(), "powershell" | "pwsh" | "cmd" | "bash" | "wsl" | "wslhost" | "wslrelay") {
+pub fn cpu_tag(name: &str, path: &str, cmd: &str) -> &'static str {
+    // shells live in System32 (or /usr/bin) but are not the system
+    let n = name.to_ascii_lowercase();
+    if matches!(n.as_str(), "powershell" | "pwsh" | "cmd" | "bash" | "wsl" | "wslhost" | "wslrelay")
+        || (!cfg!(windows) && matches!(n.as_str(), "zsh" | "fish" | "sh" | "dash" | "tmux" | "tmux: server" | "screen" | "nu"))
+    {
         return "terminal";
     }
-    let t = tags::tag(name, path, "", None);
-    if t == "other" && system_ish(name, path) { "system" } else { t }
+    let t = tags::tag(name, path, cmd, None);
+    if t == "other" && system_ish(name, path, cmd) {
+        return "system";
+    }
+    // Linux: distro daemons written in Python (networkd-dispatcher, unattended-upgrades)
+    // are the system, not a compute job
+    if t == "compute" && !cfg!(windows) {
+        let script = cmd.split_whitespace().nth(1).unwrap_or("");
+        if ["/usr/bin/", "/usr/sbin/", "/usr/share/", "/usr/lib/", "/usr/libexec/"].iter().any(|d| script.starts_with(d)) {
+            return "system";
+        }
+    }
+    t
+}
+
+#[cfg(all(test, not(windows)))]
+mod tests {
+    use super::cpu_tag;
+
+    #[test]
+    fn linux_cpu_tags() {
+        assert_eq!(cpu_tag("kworker/3:1-events", "", ""), "system");
+        assert_eq!(cpu_tag("systemd", "/usr/lib/systemd/systemd", "/sbin/init"), "system");
+        assert_eq!(cpu_tag("cron", "", "/usr/sbin/cron -f -P"), "system");
+        assert_eq!(cpu_tag("Relay(6925)", "", "/init"), "system");
+        assert_eq!(cpu_tag("networkd-dispatcher --run-startup-triggers", "", "/usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers"), "system");
+        assert_eq!(cpu_tag("bash", "/usr/bin/bash", "-bash"), "terminal");
+        assert_eq!(cpu_tag("zsh", "/usr/bin/zsh", "zsh"), "terminal");
+        assert_eq!(cpu_tag("train bd1-walk-flat", "", "/home/u/p/.venv/bin/python /home/u/p/.venv/bin/train bd1-walk-flat"), "training");
+        assert_eq!(cpu_tag("gen_sts3215", "", "/home/u/.venvs/sim/bin/python model/gen_sts3215.py"), "compute");
+        assert_eq!(cpu_tag("my-daemon", "/home/u/bin/my-daemon", "/home/u/bin/my-daemon"), "other");
+    }
 }
 
 impl Inputs {
@@ -151,8 +229,11 @@ pub fn build(inp: &Inputs) -> Snap {
         wsl: inp.wsl.clone(),
         vm_host: None,
         time: inp.time.clone(),
+        temp: None,
+        hot: vec![],
     };
     let Some(cur) = &inp.cur else { return snap };
+    snap.temp = cur.temp;
 
     // CPU % per process over the window, as a share of the whole machine
     let mut before: HashMap<(u32, i64), i64> = HashMap::new();
@@ -191,7 +272,7 @@ pub fn build(inp: &Inputs) -> Snap {
             _ => 0.0,
         };
         let path = inp.paths.get(&(p.pid, p.create)).cloned().unwrap_or_default();
-        let mut tag = cpu_tag(&p.name, &path);
+        let mut tag = cpu_tag(&p.name, &path, &p.cmd);
         let mut jev_tag = false;
         if tag == "other" {
             if let Some(t) = inp.jev_tags.get(&p.name.to_lowercase()) {
@@ -261,7 +342,18 @@ pub fn build(inp: &Inputs) -> Snap {
             }
         }
     }
+    if !cfg!(windows) {
+        snap.hot = hot(&snap.procs);
+    }
     snap
+}
+
+/// Up to three processes using at least 1% of the whole machine, busiest first.
+pub fn hot(procs: &[Proc]) -> Vec<usize> {
+    let mut v: Vec<usize> = (0..procs.len()).filter(|&i| procs[i].own_cpu >= 1.0).collect();
+    v.sort_by(|&a, &b| procs[b].own_cpu.total_cmp(&procs[a].own_cpu));
+    v.truncate(3);
+    v
 }
 
 /// Same-name siblings shown as one row ("chrome ×40") unless `--all`.

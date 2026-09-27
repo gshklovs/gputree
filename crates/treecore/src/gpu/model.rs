@@ -7,6 +7,17 @@ use std::collections::{BTreeMap, HashMap};
 
 const MIB: f64 = 1024.0 * 1024.0;
 
+/// Inside WSL (Linux build) the GPU is `/dev/dxg` and nothing is measurable per
+/// process: one row by this name carries the whole GPU and opens into the Linux
+/// processes holding /dev/dxg, as `vmwp` does on Windows.
+pub const DXG_HOST: &str = "/dev/dxg";
+
+/// The process the WSL rows hang under: the VM's worker on Windows, the /dev/dxg row
+/// inside WSL.
+pub fn is_vm_host(name: &str) -> bool {
+    name.eq_ignore_ascii_case("vmwp") || name == DXG_HOST
+}
+
 #[derive(Clone, Debug)]
 pub struct Proc {
     pub luid: u64,
@@ -85,6 +96,8 @@ pub struct Inputs {
     pub npu: Option<String>,
     pub names: HashMap<u32, String>,
     pub paths: HashMap<u32, Option<String>>,
+    /// command lines, where the platform gives them (Linux); the tags read them
+    pub cmds: HashMap<u32, String>,
     pub nv: Option<Vec<NvStats>>,
     pub wsl: Option<Vec<WslProc>>,
     /// process name (lowercase) -> tag chosen by Jev
@@ -118,7 +131,8 @@ pub fn build(inp: &Inputs) -> Snap {
             let util = r.eng.values().copied().fold(0.0, f64::max);
             let path = inp.paths.get(&pid).cloned().flatten().unwrap_or_default();
             let eng = raw.util_ready.then_some(&r.eng);
-            let mut tag = tags::tag(&name, &path, "", eng);
+            let cmd = inp.cmds.get(&pid).map(String::as_str).unwrap_or("");
+            let mut tag = tags::tag(&name, &path, cmd, eng);
             let mut jev_tag = false;
             if matches!(tag, "other" | "game?") {
                 if let Some(t) = inp.jev_tags.get(&name.to_lowercase()) {
@@ -134,7 +148,7 @@ pub fn build(inp: &Inputs) -> Snap {
     if let Some(wsl) = &inp.wsl {
         let inner = wsl.iter().filter(|w| w.tag != "other").max_by(|a, b| a.rss.total_cmp(&b.rss));
         if let Some(inner) = inner {
-            for p in procs.iter_mut().filter(|p| p.name.eq_ignore_ascii_case("vmwp")) {
+            for p in procs.iter_mut().filter(|p| is_vm_host(&p.name)) {
                 if p.util > 0.0 || p.ded > 0.0 {
                     p.tag = inner.tag;
                 }

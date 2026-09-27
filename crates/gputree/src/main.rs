@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::{Duration, Instant};
 use treecore::gpu::model::{self, Inputs, Snap, WslProc};
+// the platform layer (Windows counters / Linux fdinfo + NVML), one interface
 use treecore::gpu::{collect, headline, nvidia, render, sys as win};
 use treecore::jev::{self, JevResult};
 use treecore::layout::Headline;
@@ -84,6 +85,9 @@ impl Session {
         let pids: Vec<u32> = self.inp.raw.procs.keys().map(|k| k.1).collect();
         for pid in pids {
             self.inp.paths.entry(pid).or_insert_with(|| win::process_path(pid));
+            if let Some(c) = win::process_cmd(pid) {
+                self.inp.cmds.insert(pid, c);
+            }
         }
     }
 
@@ -97,7 +101,7 @@ impl Session {
 
     fn vm_busy(&self) -> bool {
         self.inp.raw.procs.iter().any(|(&(_, pid), r)| {
-            self.inp.names.get(&pid).is_some_and(|n| n.eq_ignore_ascii_case("vmwp"))
+            self.inp.names.get(&pid).is_some_and(|n| model::is_vm_host(n))
                 && (r.ded > 0.0 || r.eng.values().any(|v| *v > 0.0))
         })
     }
@@ -283,14 +287,6 @@ impl Session {
     }
 }
 
-unsafe extern "system" fn on_ctrl(_: u32) -> windows_sys::core::BOOL {
-    use std::io::Write;
-    let mut o = std::io::stdout();
-    let _ = o.write_all(b"\x1b[0m\x1b[?25h\n");
-    let _ = o.flush();
-    0 // let the default handler end the process
-}
-
 fn main() {
     let a = match args::parse() {
         Ok(a) => a,
@@ -335,9 +331,7 @@ fn main() {
     if a.watch > 0.0 {
         let mut painter = Some(Painter::new(color, true));
         if tty {
-            unsafe {
-                windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(on_ctrl), 1);
-            }
+            term::restore_on_interrupt();
             print!("\x1b[?25l\x1b[H\x1b[2J");
         } else {
             painter = None;

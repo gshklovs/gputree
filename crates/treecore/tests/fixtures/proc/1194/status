@@ -1,0 +1,20 @@
+Name:	train
+Umask:	0022
+State:	S (sleeping)
+Tgid:	1194
+Ngid:	0
+Pid:	1194
+PPid:	1193
+TracerPid:	0
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+FDSize:	256
+VmPeak:	60012345 kB
+VmSize:	58593750 kB
+VmLck:	       0 kB
+VmHWM:	 2901234 kB
+VmRSS:	 2869516 kB
+RssAnon:	 2501234 kB
+RssFile:	  360000 kB
+RssShmem:	    8282 kB
+Threads:	57

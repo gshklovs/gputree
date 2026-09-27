@@ -1,5 +1,6 @@
-//! NVIDIA temperature / power / utilisation. NVML (nvml.dll in System32) first,
-//! `nvidia-smi` as a fallback. Both are read-only queries.
+//! NVIDIA temperature / power / utilisation. NVML first (nvml.dll in System32 on
+//! Windows, libnvidia-ml.so.1 on Linux, loaded at run time so the tools start without
+//! it), `nvidia-smi` as a fallback. Both are read-only queries.
 
 use nvml_wrapper::Nvml;
 use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
@@ -15,8 +16,13 @@ pub struct NvStats {
 
 static NVML: OnceLock<Option<Nvml>> = OnceLock::new();
 
+/// The process-wide NVML handle, initialised on first use. None without the driver.
+pub fn nvml() -> Option<&'static Nvml> {
+    NVML.get_or_init(|| Nvml::init().ok()).as_ref()
+}
+
 fn via_nvml() -> Option<Vec<NvStats>> {
-    let nvml = NVML.get_or_init(|| Nvml::init().ok()).as_ref()?;
+    let nvml = nvml()?;
     let n = nvml.device_count().ok()?;
     let mut out = vec![];
     for i in 0..n {
@@ -32,14 +38,17 @@ fn via_nvml() -> Option<Vec<NvStats>> {
     (!out.is_empty()).then_some(out)
 }
 
+/// Runs `nvidia-smi` with `args` (no console window on Windows) and returns stdout.
+pub fn smi(args: &[&str]) -> Option<String> {
+    let mut cmd = std::process::Command::new("nvidia-smi");
+    cmd.args(args).stdin(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+    crate::no_window(&mut cmd);
+    let out = cmd.output().ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
 fn via_smi() -> Option<Vec<NvStats>> {
-    use std::os::windows::process::CommandExt;
-    let out = std::process::Command::new("nvidia-smi")
-        .args(["--query-gpu=name,utilization.gpu,temperature.gpu,power.draw", "--format=csv,noheader,nounits"])
-        .creation_flags(crate::CREATE_NO_WINDOW)
-        .output()
-        .ok()?;
-    let text = String::from_utf8_lossy(&out.stdout);
+    let text = smi(&["--query-gpu=name,utilization.gpu,temperature.gpu,power.draw", "--format=csv,noheader,nounits"])?;
     let v: Vec<NvStats> = text
         .lines()
         .filter_map(|l| {

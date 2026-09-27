@@ -3,7 +3,7 @@
 
 use super::Opts;
 use super::headline;
-use super::model::{Gpu, Proc, Snap, by_tag, is_active, sort_procs};
+use super::model::{DXG_HOST, Gpu, Proc, Snap, by_tag, is_active, is_vm_host, sort_procs};
 use crate::layout::{DIM, Headline, Out, Row, layout};
 use crate::tags;
 use crate::term::{Line, fmt_bytes};
@@ -45,10 +45,13 @@ impl Ctx<'_> {
         } else {
             Some(0.0)
         };
-        let vm = p.name.eq_ignore_ascii_case("vmwp");
+        let vm = is_vm_host(&p.name);
+        let dxg = p.name == DXG_HOST;
         let mut name = Line::new();
         name.plain(p.name.clone());
-        if vm {
+        if dxg {
+            name.push(MAG, " (WSL GPU, whole adapter)");
+        } else if vm {
             name.push(MAG, " (WSL2 VM)");
         }
         self.row(Row {
@@ -59,7 +62,7 @@ impl Ctx<'_> {
             name,
             alts: vec![],
             tag: (!a.group).then_some((p.tag, p.jev_tag)),
-            pid: format!("pid {}", p.pid),
+            pid: if dxg { String::new() } else { format!("pid {}", p.pid) },
         });
 
         // children: engines, WSL processes, spill note
@@ -297,7 +300,16 @@ pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     for g in gpus {
         cx.adapter(g);
     }
-    if s.wsl.as_ref().is_some_and(|w| !w.is_empty()) {
+    let dxg = s.gpus.iter().flat_map(|g| &g.procs).any(|p| p.name == DXG_HOST);
+    if dxg {
+        cx.out.push(Out::Free(Line::new()));
+        let mut f = Line::new();
+        f.push(
+            DIM,
+            "Limited view (WSL): per-process GPU use is not visible here. /dev/dxg is the whole GPU (Windows' use included); under it, the Linux processes holding it (RAM shown).",
+        );
+        cx.out.push(Out::Wrap(f));
+    } else if s.wsl.as_ref().is_some_and(|w| !w.is_empty()) {
         cx.out.push(Out::Free(Line::new()));
         let mut f = Line::new();
         f.push(DIM, "WSL rows: Linux processes holding /dev/dxg (host RAM shown). They share one VM, so their GPU % is the VM's total.");
@@ -359,6 +371,47 @@ mod tests {
             tag: "training",
         };
         Snap { gpus: vec![g], util_ready: true, wsl: Some(vec![w]), time: "12:00:00".into() }
+    }
+
+    /// The Linux-in-WSL view: no per-process GPU numbers, one /dev/dxg row for the
+    /// whole adapter, the Linux processes holding /dev/dxg under it.
+    #[test]
+    fn wsl_limited_view() {
+        let mut s = fixture();
+        let g = &mut s.gpus[0];
+        let mut eng = BTreeMap::new();
+        eng.insert("gpu".to_string(), 45.0);
+        g.eng = eng.clone();
+        g.util = 45.0;
+        g.procs = vec![Proc {
+            luid: 1,
+            pid: 0,
+            name: super::super::model::DXG_HOST.into(),
+            ded: 2.6e9,
+            shr: 0.0,
+            eng,
+            util: 45.0,
+            tag: "training",
+            jev_tag: false,
+        }];
+        let h = local_headline(&s);
+        assert!(h.text.contains("train bd1-walk-flat, WSL"), "{}", h.text);
+        for w in [60, 100, 140] {
+            let lines = render(&s, &args(), &h, w);
+            let text: Vec<String> = lines.iter().map(|l| l.render(false)).collect();
+            for l in &lines {
+                assert!(l.width() <= w, "{w}: {:?}", l.render(false));
+            }
+            let row = text.iter().find(|l| l.contains("/dev/dxg")).unwrap();
+            assert!(!row.contains("pid 0"), "{row}");
+            assert!(text.iter().any(|l| l.contains("train bd")), "{text:#?}");
+            assert!(text.iter().any(|l| l.contains("Limited view (WSL)")), "{text:#?}");
+            assert!(text.iter().any(|l| l.ends_with("(RAM shown).")), "the note is not clipped at {w}: {text:#?}");
+            if w >= 100 {
+                assert!(row.contains("(WSL GPU, whole adapter)"), "{row}");
+                assert!(text.iter().any(|l| l.contains("pid 4934")), "{text:#?}");
+            }
+        }
     }
 
     fn args() -> Opts {

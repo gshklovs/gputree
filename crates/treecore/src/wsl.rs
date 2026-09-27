@@ -1,18 +1,18 @@
-//! Looking inside WSL2 distros (read-only: a shell script that only reads /proc).
+//! Looking inside WSL2 distros from Windows (read-only: a shell script that only reads
+//! /proc), and the command-line shortening every Linux process row uses. On Linux the
+//! processes are local, so there are no distros to call into.
 
-use std::os::windows::process::CommandExt;
 use std::process::{Command, Stdio};
 
-/// Distros that are currently running (`wsl -l --running -q`).
+/// Distros that are currently running (`wsl -l --running -q`). None on Linux.
 pub fn running_distros() -> Vec<String> {
-    let Ok(out) = Command::new("wsl.exe")
-        .args(["-l", "--running", "-q"])
-        .env("WSL_UTF8", "1")
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .creation_flags(crate::CREATE_NO_WINDOW)
-        .output()
-    else {
+    if !cfg!(windows) {
+        return vec![];
+    }
+    let Ok(out) = crate::no_window(
+        Command::new("wsl.exe").args(["-l", "--running", "-q"]).env("WSL_UTF8", "1").stdin(Stdio::null()).stderr(Stdio::null()),
+    )
+    .output() else {
         return vec![];
     };
     let mut text = String::from_utf8_lossy(&out.stdout).replace('\0', "");
@@ -44,13 +44,14 @@ fn b64(data: &[u8]) -> String {
 /// break it) and returns its stdout.
 pub fn run_script(distro: &str, script: &str) -> Option<String> {
     let code = b64(script.replace('\r', "").as_bytes());
-    let out = Command::new("wsl.exe")
-        .args(["-d", distro, "-u", "root", "--", "sh", "-c", &format!("echo {code} | base64 -d | sh")])
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .creation_flags(crate::CREATE_NO_WINDOW)
-        .output()
-        .ok()?;
+    let out = crate::no_window(
+        Command::new("wsl.exe")
+            .args(["-d", distro, "-u", "root", "--", "sh", "-c", &format!("echo {code} | base64 -d | sh")])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null()),
+    )
+    .output()
+    .ok()?;
     Some(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
@@ -73,7 +74,7 @@ fn base(p: &str) -> &str {
     p.rsplit('/').next().unwrap_or(p)
 }
 
-fn is_interp(tok: &str) -> bool {
+pub fn is_interp(tok: &str) -> bool {
     let b = base(tok);
     let b = b.trim_end_matches(|c: char| c.is_ascii_digit() || c == '.');
     matches!(b, "python" | "node" | "bun" | "deno" | "ruby" | "perl" | "bash" | "sh" | "zsh" | "java" | "uv" | "uvx")

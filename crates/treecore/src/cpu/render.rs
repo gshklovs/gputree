@@ -160,14 +160,19 @@ fn core_lines(s: &Snap, width: usize, gutter: usize) -> Vec<Out> {
 }
 
 pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
+    // chains that are always expanded, whatever --depth says: down to the VM host, and
+    // (Linux, where trees run deep) down to the busiest processes
     let mut vm_path = vec![];
-    let mut at = s.vm_host;
-    while let Some(i) = at {
-        if vm_path.contains(&i) {
-            break;
+    let starts = s.vm_host.into_iter().chain(s.hot.iter().filter_map(|&h| s.procs[h].parent));
+    for start in starts {
+        let mut at = Some(start);
+        while let Some(i) = at {
+            if vm_path.contains(&i) {
+                break;
+            }
+            vm_path.push(i);
+            at = s.procs[i].parent;
         }
-        vm_path.push(i);
-        at = s.procs[i].parent;
     }
     let mut cx = Ctx { o, s, out: vec![], vm_path };
     cx.out.push(Out::Wrap(head.line()));
@@ -191,6 +196,9 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
         rest.push(DIM, format!("user {} · kernel {}", pct(s.user), pct(s.kernel)));
     } else {
         rest.push(DIM, "sampling…");
+    }
+    if let Some(t) = s.temp {
+        rest.push(DIM, format!(" · {t:.0}°C"));
     }
     cx.out.push(Out::Label {
         label: "cpu",
@@ -305,4 +313,83 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
 pub fn local_headline(s: &Snap) -> Headline {
     let text = headline::candidates(s).into_iter().next().map(|c| c.text).unwrap_or_else(|| "Sampling CPU load…".into());
     Headline { text, source: "", jev_tags: 0 }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::model::{Proc, Snap};
+    use super::*;
+
+    fn p(pid: u32, ppid: u32, name: &str, parent: Option<usize>, kids: Vec<usize>, own: f64, sub: f64, tag: &'static str) -> Proc {
+        Proc {
+            pid,
+            ppid,
+            name: name.into(),
+            path: String::new(),
+            parent,
+            kids,
+            own_cpu: own,
+            own_mem: 1e8,
+            sub_cpu: sub,
+            sub_mem: 1e8,
+            threads: 1,
+            tag,
+            jev_tag: false,
+        }
+    }
+
+    /// A Linux-shaped tree: the training run five levels down.
+    fn fixture(hot: Vec<usize>) -> Snap {
+        let procs = vec![
+            p(1, 0, "systemd", None, vec![1, 5], 0.0, 4.0, "system"),
+            p(1000, 1, "systemd", Some(0), vec![2], 0.0, 3.8, "system"),
+            p(1191, 1000, "flock", Some(1), vec![3], 0.0, 3.8, "training"),
+            p(1193, 1191, "timeout", Some(2), vec![4], 0.0, 3.8, "training"),
+            p(1194, 1193, "train bd1-walk-flat", Some(3), vec![], 3.8, 3.8, "training"),
+            p(60, 1, "systemd-journald", Some(0), vec![], 0.2, 0.2, "system"),
+        ];
+        Snap {
+            procs,
+            roots: vec![0],
+            cpu_ready: true,
+            total: 5.0,
+            user: 4.0,
+            kernel: 1.0,
+            cores: vec![2.0, 91.0, 1.0, 0.0],
+            mem_total: 16e9,
+            mem_used: 4e9,
+            ncpu: 4,
+            wsl: None,
+            vm_host: None,
+            time: "12:00:00".into(),
+            temp: Some(54.0),
+            hot,
+        }
+    }
+
+    fn opts(depth: u8) -> Opts {
+        Opts { metric_mem: false, depth, top: 8, group: false, all: false }
+    }
+
+    #[test]
+    fn busy_chains_expand_past_depth_and_fit_the_width() {
+        let s = fixture(vec![4]);
+        let h = local_headline(&s);
+        for w in [60, 100, 140] {
+            let lines = render(&s, &opts(2), &h, w);
+            let text: Vec<String> = lines.iter().map(|l| l.render(false)).collect();
+            for l in &lines {
+                assert!(l.width() <= w, "{w}: {:?}", l.render(false));
+            }
+            assert!(text.iter().any(|l| l.contains("train bd")), "{w}: {text:#?}");
+            if w >= 100 {
+                assert!(text.iter().any(|l| l.contains("pid 1194")), "{w}: {text:#?}");
+                assert!(text.iter().any(|l| l.contains("54°C")), "{text:#?}");
+            }
+        }
+        // without a hot list (Windows), --depth alone decides
+        let s = fixture(vec![]);
+        let text: Vec<String> = render(&s, &opts(2), &h, 100).iter().map(|l| l.render(false)).collect();
+        assert!(!text.iter().any(|l| l.contains("pid 1194")), "{text:#?}");
+    }
 }

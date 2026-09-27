@@ -1,0 +1,10 @@
+# NVML-shaped samples for one device (00000000:01:00.0), in the order the Linux
+# backend reads them:
+#   compute|graphics <pid> <used bytes | n/a>        nvmlDeviceGet{Compute,Graphics}RunningProcesses
+#   util <pid> <timestamp us> <sm> <mem> <enc> <dec>  nvmlDeviceGetProcessUtilization
+compute 1194 2952790016
+graphics 2210 104857600
+compute 2300 n/a
+util 1194 1000100 91 40 0 0
+util 1194 1000200 93 41 0 0
+util 2210 1000150 4 1 12 0

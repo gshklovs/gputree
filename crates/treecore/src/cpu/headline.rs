@@ -42,7 +42,13 @@ fn contributors(s: &Snap) -> Vec<Who> {
             v.push(Who { label: "the WSL VM".into(), cpu: g.own_cpu, mem: g.own_mem, tag: "vm" });
             continue;
         }
-        let label = if g.name.eq_ignore_ascii_case("system") { "Windows (System)".into() } else { pretty_name(&g.name) };
+        let label = if g.name.eq_ignore_ascii_case("system") {
+            "Windows (System)".into()
+        } else if !cfg!(windows) && g.name.contains(' ') {
+            g.name.clone() // a Linux command label ("train bd1-walk-flat") stays as typed
+        } else {
+            pretty_name(&g.name)
+        };
         v.push(Who { label, cpu: g.own_cpu, mem: g.own_mem, tag: g.tag });
     }
     v.sort_by(|a, b| b.cpu.total_cmp(&a.cpu));

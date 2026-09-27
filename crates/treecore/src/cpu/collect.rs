@@ -35,8 +35,9 @@ END { for (p in t1) { d = (p in t0) ? t1[p] - t0[p] : 0; if (d > 0 || rss[p] > 5
 done
 "#;
 
-/// Busiest Linux processes in every running distro. CPU is a share of all `ncpu`
-/// Windows logical processors, so it compares directly with Windows processes.
+/// Busiest Linux processes in every running distro (from Windows; on Linux there are
+/// no distros to call into and this is empty). CPU is a share of all `ncpu` Windows
+/// logical processors, so it compares directly with Windows processes.
 pub fn wsl_cpu_procs(ncpu: usize) -> Vec<LinuxProc> {
     let mut out = vec![];
     for (distro, text) in wsl::run_everywhere(WSL_CPU_SCRIPT) {
@@ -136,7 +137,8 @@ pub fn jev_job(s: &Snap, known: &HashMap<String, &'static str>) -> Option<JevJob
         qs.push(jev::tag_question(
             key.clone(),
             format!(
-                "Windows process '{}'{} is using {:.1}% of the CPU and {} of memory. Which category best describes what this program is?",
+                "{} process '{}'{} is using {:.1}% of the CPU and {} of memory. Which category best describes what this program is?",
+                crate::OS,
                 g.name,
                 if g.members.len() > 1 { format!(" ({} instances)", g.members.len()) } else { String::new() },
                 g.own_cpu,
