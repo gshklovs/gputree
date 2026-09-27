@@ -26,6 +26,13 @@ struct Ctx<'a> {
     out: Vec<Out>,
 }
 
+/// How much of the screen to draw: processes per adapter (in drawing order) and
+/// whether the footnotes are shown. `render_fit` shrinks these to fit a terminal.
+struct Budget {
+    tops: Vec<usize>,
+    notes: bool,
+}
+
 impl Ctx<'_> {
     fn row(&mut self, r: Row) {
         self.out.push(Out::Row(r));
@@ -150,7 +157,7 @@ impl Ctx<'_> {
         });
     }
 
-    fn adapter(&mut self, g: &Gpu) {
+    fn adapter(&mut self, g: &Gpu, top: usize) {
         let a = self.a;
         self.out.push(Out::Free(Line::new()));
         let mut head = Line::new();
@@ -235,8 +242,8 @@ impl Ctx<'_> {
                 }
                 let mut sub: Vec<&Proc> = t.procs.iter().copied().filter(|p| is_active(p, a.all)).collect();
                 sort_procs(g, &mut sub, a.metric_util);
-                if !a.all && sub.len() > a.top {
-                    sub.truncate(a.top);
+                if !a.all && sub.len() > top {
+                    sub.truncate(top);
                 }
                 let more = t.procs.len() - sub.len();
                 let pre = if last_t { "   " } else { "│  " };
@@ -253,8 +260,8 @@ impl Ctx<'_> {
         } else {
             let mut sorted: Vec<&Proc> = g.procs.iter().filter(|p| is_active(p, a.all)).collect();
             sort_procs(g, &mut sorted, a.metric_util);
-            if !a.all && sorted.len() > a.top {
-                sorted.truncate(a.top);
+            if !a.all && sorted.len() > top {
+                sorted.truncate(top);
             }
             let hidden = g.procs.len() - sorted.len();
             let hidden_mem: f64 = g.procs.iter().filter(|p| !sorted.iter().any(|s| std::ptr::eq(*s, *p))).map(|p| g.pmem(p)).sum();
@@ -275,6 +282,55 @@ impl Ctx<'_> {
 
 /// Lay everything out for a terminal `width` columns wide. No returned line is wider.
 pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
+    render_with(s, a, head, width, &Budget { tops: vec![a.top; s.gpus.len()], notes: true })
+}
+
+/// Like `render`, but at most `max_lines` tall (for a terminal screen), so the
+/// progressive redraw can happen in place. It keeps the headline, every adapter's
+/// summary and the busiest rows, and folds the rest into "+ N more" rows, giving up
+/// detail from the bottom: later adapters' process rows first, then the footnotes,
+/// then the first adapter's engine rows, then its processes. `--all` is never folded.
+pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: usize) -> Vec<Line> {
+    let full = render(s, a, head, width);
+    if a.all || full.len() <= max_lines {
+        return full;
+    }
+    let mut b = Budget { tops: vec![a.top; s.gpus.len()], notes: true };
+    let mut o = a.clone();
+    let fits = |o: &Opts, b: &Budget| {
+        let l = render_with(s, o, head, width, b);
+        (l.len() <= max_lines).then_some(l)
+    };
+    for i in (1..b.tops.len()).rev() {
+        while b.tops[i] > 0 {
+            b.tops[i] -= 1;
+            if let Some(l) = fits(&o, &b) {
+                return l;
+            }
+        }
+    }
+    b.notes = false;
+    if let Some(l) = fits(&o, &b) {
+        return l;
+    }
+    if o.depth > 2 {
+        o.depth = 2;
+        if let Some(l) = fits(&o, &b) {
+            return l;
+        }
+    }
+    while b.tops.first().is_some_and(|t| *t > 0) {
+        b.tops[0] -= 1;
+        if let Some(l) = fits(&o, &b) {
+            return l;
+        }
+    }
+    let mut l = render_with(s, &o, head, width, &b);
+    l.truncate(max_lines);
+    l
+}
+
+fn render_with(s: &Snap, a: &Opts, head: &Headline, width: usize, budget: &Budget) -> Vec<Line> {
     let mut cx = Ctx { a, s, out: vec![] };
 
     // headline + title
@@ -295,21 +351,21 @@ pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
 
     let mut gpus: Vec<&Gpu> = s.gpus.iter().collect();
     gpus.sort_by(|x, y| if a.metric_util { y.util.total_cmp(&x.util) } else { y.mem.total_cmp(&x.mem) });
-    for g in gpus {
-        cx.adapter(g);
+    for (i, g) in gpus.into_iter().enumerate() {
+        cx.adapter(g, budget.tops.get(i).copied().unwrap_or(a.top));
     }
-    if s.wsl.as_ref().is_some_and(|w| !w.is_empty()) {
+    if budget.notes && s.wsl.as_ref().is_some_and(|w| !w.is_empty()) {
         cx.out.push(Out::Free(Line::new()));
         let mut f = Line::new();
         f.push(DIM, "WSL rows: Linux processes holding /dev/dxg (host RAM shown). They share one VM, so their GPU % is the VM's total.");
         cx.out.push(Out::Wrap(f));
     }
-    if s.gpus.iter().any(|g| g.integrated && g.procs.iter().any(|p| p.adjusted)) {
+    if budget.notes && s.gpus.iter().any(|g| g.integrated && g.procs.iter().any(|p| p.adjusted)) {
         let mut f = Line::new();
         f.push(DIM, "~ shared memory scaled to fit the adapter: Windows counts pages several processes map once per process.");
         cx.out.push(Out::Wrap(f));
     }
-    if head.jev_tags > 0 {
+    if budget.notes && head.jev_tags > 0 {
         let mut f = Line::new();
         f.push(DIM, "* tag chosen by Jev");
         cx.out.push(Out::Free(f));
@@ -367,6 +423,44 @@ mod tests {
 
     fn args() -> Opts {
         Opts { metric_util: false, depth: 3, top: 10, group: false, all: false }
+    }
+
+    #[test]
+    fn fit_keeps_the_summary_and_folds_the_rest() {
+        let mut s = fixture();
+        let mut ig = s.gpus[0].clone();
+        ig.luid = 2;
+        ig.name = "Intel(R) Graphics".into();
+        ig.short = "Intel iGPU".into();
+        ig.integrated = true;
+        ig.mem = 1e9;
+        ig.procs = (0..8)
+            .map(|i| Proc { luid: 2, pid: 100 + i, name: format!("app{i}"), ded: 0.0, shr: 5e7, eng: BTreeMap::new(), util: 1.0, tag: "app", jev_tag: false, shr_raw: 0.0, adjusted: false })
+            .collect();
+        s.gpus.push(ig);
+        let h = local_headline(&s);
+        let full = render(&s, &args(), &h, 100);
+        for max in [full.len(), 20, 16, 12, 9] {
+            let l = render_fit(&s, &args(), &h, 100, max);
+            let text: Vec<String> = l.iter().map(|l| l.render(false)).collect();
+            assert!(l.len() <= max, "{max}: {text:#?}");
+            assert!(text[0].contains("busy"), "{text:#?}");
+            assert!(l.iter().all(|x| x.width() <= 100));
+            if max >= 16 {
+                // every adapter keeps its summary while there is room for it
+                assert!(text.iter().any(|t| t.contains("Intel(R) Graphics")), "{max}: {text:#?}");
+            }
+            if max < full.len() {
+                assert!(text.iter().any(|t| t.contains("more process")), "{max}: {text:#?}");
+            }
+            if max >= 16 {
+                // the discrete GPU's rows survive; the iGPU folds first
+                assert!(text.iter().any(|t| t.contains("vmwp")), "{max}: {text:#?}");
+            }
+        }
+        let mut all = args();
+        all.all = true;
+        assert!(render_fit(&s, &all, &h, 100, 9).len() > 9, "--all is never folded");
     }
 
     #[test]

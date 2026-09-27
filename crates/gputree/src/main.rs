@@ -74,10 +74,14 @@ impl Session {
         h
     }
 
-    fn lines(&self, width: usize) -> Vec<Line> {
+    /// `max_lines`: fit a terminal screen (TTY); None = everything (piped).
+    fn lines(&self, width: usize, max_lines: Option<usize>) -> Vec<Line> {
         let s = model::build(&self.inp);
         let h = self.headline(&s);
-        render::render(&s, &self.opts, &h, width)
+        match max_lines {
+            Some(m) => render::render_fit(&s, &self.opts, &h, width, m),
+            None => render::render(&s, &self.opts, &h, width),
+        }
     }
 
     fn refresh_names(&mut self) {
@@ -156,7 +160,10 @@ impl Session {
         let rows = term::rows();
         let draw = |s: &Self, p: &mut Option<Painter>, final_: bool| {
             let width = term::columns(s.a.width);
-            let mut lines = s.lines(width);
+            // on a terminal, fold the tree to the screen so every phase can redraw in
+            // place (one row is kept for the cursor, one more for the watch footer)
+            let fit = p.is_some().then(|| rows.saturating_sub(if watch_footer.is_some() { 2 } else { 1 }).max(5));
+            let mut lines = s.lines(width, fit);
             if let Some(f) = watch_footer {
                 let max = rows.saturating_sub(2).max(5);
                 lines.truncate(max);

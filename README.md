@@ -37,7 +37,9 @@ WSL rows: Linux processes holding /dev/dxg (host RAM shown). They share one VM, 
 ```
 
 In a terminal the bars are smooth eighth-blocks on a dim track and the tags are
-coloured; piped, it prints plain text once.
+coloured; piped, it prints plain text once. On a terminal the tree folds to fit the
+screen (later adapters first, into `+ N more` rows) so every phase redraws in place;
+`--all` or piping shows everything.
 
 The same repo builds **cputree**, the same idea for the CPU: the real process
 tree with CPU and memory rolled up to parents, and the WSL2 VM opened up into
