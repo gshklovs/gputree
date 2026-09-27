@@ -1,0 +1,11 @@
+[package]
+name = "gputree-gui"
+description = "gputree as a disktree-style treemap window"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+treecore = { path = "../treecore" }
+treeview = { path = "../treeview" }
+gpui-kit = { version = "=0.6.6", default-features = false, features = ["assets"] }

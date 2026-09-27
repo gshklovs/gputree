@@ -212,6 +212,60 @@ process alone. Rows are sorted by the subtree total, largest first, with
 | `-a`, `--all` | no merging, no limits |
 | `-w`, `--watch N`, `--no-wsl`, `--no-ai`, `--width N`, `--no-color` | as in gputree |
 
+## The windows: gputree-gui and cputree-gui
+
+![gputree-gui: the NVIDIA GPU's VRAM held by the WSL2 VM and, inside it, the training run; the Intel iGPU's shared memory by process](assets/gputree-gui.png)
+
+![cputree-gui: the process tree by rolled-up CPU, the WSL2 VM under vmcompute](assets/cputree-gui.png)
+
+The same data as disktree-style treemaps. `gputree-gui` draws adapters ->
+processes -> engines (by util) or -> the Linux processes inside the WSL2 VM (by
+VRAM, split by RSS); `cputree-gui` draws the real process tree sized by
+rolled-up CPU or memory, same-name siblings merged, the VM opening into its
+Linux processes. Tiles are coloured by tag, the plain-English headline (Jev or
+local) sits in the top bar, the numbers refresh every 1.5 s and tiles glide to
+their new sizes.
+
+- **Keys, as in disktree:** arrows / `hjkl` move between tiles at a level,
+  `tab` goes to the next largest, `enter` (or a second click, or a double
+  click, or scrolling up) zooms in, `backspace` / `esc` / right-click go up,
+  `[` `]` change how many levels are drawn, `t` switches the metric, `0` goes
+  back to the top, `?` lists every key, `q` quits. The trail over the mosaic is
+  clickable.
+- **Hover or select** a tile for its pid(s), path or full command, tag,
+  both metrics, and engines.
+- **Read-only.** disktree's mark / review / remove flow is not here, and there
+  is no end-task action anywhere, not even behind a confirmation.
+- **Fast first paint.** The window opens at once (GPUI start-up is ~0.3 s) and
+  fills progressively like the CLIs: sizes, then rates, then NVML / WSL / Jev.
+
+```powershell
+gputree-gui [--metric vram|util] [--depth 1-6] [--no-wsl] [--no-ai]
+cputree-gui [--metric cpu|mem]   [--depth 1-6] [--no-wsl] [--no-ai]
+```
+
+The windows are built with [GPUI](https://gpui-kit.com/) through gpui-kit and
+[gpui-omarchy](https://github.com/huacnlee/gpui-omarchy), like disktree, and
+follow Windows' light or dark setting. GPUI needs the MSVC toolchain (Visual
+Studio Build Tools, C++ workload):
+
+```powershell
+cargo +stable-x86_64-pc-windows-msvc build --release --target x86_64-pc-windows-msvc -p gputree-gui -p cputree-gui
+```
+
+A plain `cargo build` (workspace `default-members`) builds only the CLIs, which
+also build on the GNU toolchain.
+
+### Credit
+
+The windows' look is adapted from [disktree](https://github.com/tobi/disktree)
+by Tobi Lütke, MIT License, Copyright (c) 2026 Tobi Lütke: the squarified
+layout with header bands and the merged tail, the muted per-kind palette with
+its accent strip and amber selection, the mosaic painting and label placement,
+the top bar / trail / side panel / key bar structure, the theme handling and
+the keyboard model. The adapted files in `crates/treeview/src` say so at the
+top and keep that notice.
+
 ## Tags
 
 Every process gets one tag from its name, image path and (for WSL) command
@@ -294,6 +348,8 @@ A cargo workspace:
 | `crates/treecore/src/term.rs` | styled, width-safe lines, bars, in-place redraw |
 | `crates/treecore/src/{tags,jev,wsl}.rs` | tag rules, the Jev call, running scripts inside WSL |
 | `crates/gputree`, `crates/cputree` | the two command-line tools (flags, progressive frames) |
+| `crates/treeview` | the GPUI treemap window (adapted from disktree) |
+| `crates/gputree-gui`, `crates/cputree-gui` | the two windows: collectors that turn treecore snapshots into trees |
 | `legacy/` | the original PowerShell version |
 
 ## License

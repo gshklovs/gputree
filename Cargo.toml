@@ -1,6 +1,16 @@
 [workspace]
 resolver = "3"
-members = ["crates/treecore", "crates/gputree", "crates/cputree"]
+members = [
+    "crates/treecore",
+    "crates/gputree",
+    "crates/cputree",
+    "crates/treeview",
+    "crates/gputree-gui",
+    "crates/cputree-gui",
+]
+# The CLIs build on either toolchain; the GUIs (GPUI) need MSVC, so a plain
+# `cargo build` leaves them out. See README: Develop.
+default-members = ["crates/treecore", "crates/gputree", "crates/cputree"]
 
 [workspace.package]
 version = "0.1.0"

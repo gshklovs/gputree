@@ -1,0 +1,12 @@
+[package]
+name = "treeview"
+description = "The disktree-style treemap window shared by gputree-gui and cputree-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+treecore = { path = "../treecore" }
+gpui-kit = { version = "=0.6.6", default-features = false, features = ["assets"] }
+gpui-omarchy = "0.1.3"
+windows-sys = { version = "0.61", features = ["Win32_System_Console"] }
