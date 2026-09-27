@@ -24,6 +24,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "cputree"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "treecore",
+ "windows-sys",
+]
+
+[[package]]
 name = "crossterm"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -111,10 +120,7 @@ name = "gputree"
 version = "0.1.0"
 dependencies = [
  "crossterm",
- "nvml-wrapper",
- "regex",
- "serde_json",
- "unicode-width",
+ "treecore",
  "windows-sys",
 ]
 
@@ -394,6 +400,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "treecore"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "nvml-wrapper",
+ "regex",
+ "serde_json",
+ "unicode-width",
+ "windows-sys",
 ]
 
 [[package]]

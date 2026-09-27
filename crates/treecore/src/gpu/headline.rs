@@ -1,7 +1,7 @@
 //! One plain-English sentence at the top. Built locally from templates; Jev (optional)
 //! only picks which template reads best and re-tags unknown processes.
 
-use crate::model::{Gpu, Proc, Snap, by_tag};
+use super::model::{Gpu, Proc, Snap, by_tag};
 
 pub fn tag_phrase(tag: &str) -> &'static str {
     match tag {

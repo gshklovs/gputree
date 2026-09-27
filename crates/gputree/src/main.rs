@@ -2,24 +2,15 @@
 //! Read-only: it samples counters and reads /proc, and never touches any process.
 
 mod args;
-mod headline;
-mod jev;
-mod model;
-mod nvidia;
-mod render;
-mod tags;
-mod term;
-mod win;
-mod wsl;
 
-use model::{Inputs, Snap, WslProc};
-use render::Headline;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::{Duration, Instant};
-use term::{Line, Painter};
-
-pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+use treecore::gpu::model::{self, Inputs, Snap, WslProc};
+use treecore::gpu::{collect, headline, nvidia, render, sys as win};
+use treecore::jev::{self, JevResult};
+use treecore::layout::Headline;
+use treecore::term::{self, Line, Painter};
 
 /// Second PDH sample this long after the first (utilisation is a rate).
 const UTIL_WINDOW: Duration = Duration::from_millis(280);
@@ -28,159 +19,18 @@ const DEADLINE: Duration = Duration::from_millis(2200);
 /// Start Jev without WSL names if WSL has not answered by then.
 const JEV_LATEST_START: Duration = Duration::from_millis(1100);
 
-const WSL_SCRIPT: &str = r#"for p in /proc/[0-9]*; do
-  ls -l $p/fd 2>/dev/null | grep -q /dev/dxg || continue
-  pid=${p#/proc/}
-  rss=$(awk '/^VmRSS/{print $2}' $p/status 2>/dev/null)
-  user=$(stat -c %U $p 2>/dev/null)
-  cwd=$(readlink $p/cwd 2>/dev/null)
-  cmd=$(tr '\0' ' ' < $p/cmdline 2>/dev/null)
-  echo "$pid|${rss:-0}|$user|$cwd|$cmd"
-done
-"#;
-
 enum Msg {
     Nv(Vec<nvidia::NvStats>),
     Wsl(Vec<WslProc>),
     Jev(Result<JevResult, String>, Duration),
 }
 
-struct JevResult {
-    kind: Option<String>,
-    tags: HashMap<String, &'static str>,
-}
-
-/// Linux processes inside every running WSL distro that hold the paravirtual GPU.
-fn wsl_gpu_procs() -> Vec<WslProc> {
-    let mut out = vec![];
-    for (distro, text) in wsl::run_everywhere(WSL_SCRIPT) {
-        for l in text.lines() {
-            let f: Vec<&str> = l.splitn(5, '|').collect();
-            if f.len() < 5 {
-                continue;
-            }
-            let cmd = f[4].trim().to_string();
-            if cmd.is_empty() {
-                continue;
-            }
-            let first = cmd.split_whitespace().next().unwrap_or("");
-            let base = first.rsplit('/').next().unwrap_or(first);
-            let (label, project) = wsl::shorten(&cmd, f[3]);
-            out.push(WslProc {
-                distro: distro.clone(),
-                pid: f[0].parse().unwrap_or(0),
-                rss: f[1].trim().parse::<f64>().unwrap_or(0.0) * 1024.0,
-                user: f[2].to_string(),
-                tag: tags::tag(base, "", &cmd, None),
-                cmd,
-                label,
-                project,
-            });
-        }
-    }
-    out
-}
-
-/// Compact, privacy-safe text state for Jev: names, tags, numbers and short commands only.
-fn jev_state(s: &Snap) -> String {
-    let mut o = String::new();
-    for g in &s.gpus {
-        let eng: Vec<String> = g.eng.iter().filter(|(_, v)| **v >= 0.5).map(|(k, v)| format!("{k} {v:.0}%")).collect();
-        o.push_str(&format!(
-            "- {}{}: util {:.0}% ({}), memory {} of {}",
-            g.short,
-            if g.npu { " (NPU)" } else if g.integrated { " (integrated)" } else { "" },
-            g.util,
-            if eng.is_empty() { "idle".into() } else { eng.join(", ") },
-            term::fmt_bytes(g.mem),
-            if g.cap > 0.0 { term::fmt_bytes(g.cap) } else { "?".into() },
-        ));
-        if let Some(n) = &g.nv {
-            if let Some(t) = n.temp {
-                o.push_str(&format!(", {t}C"));
-            }
-        }
-        o.push('\n');
-        let mut ps: Vec<&model::Proc> = g.procs.iter().filter(|p| model::is_active(p, false)).collect();
-        model::sort_procs(g, &mut ps, true);
-        for p in ps.iter().take(6) {
-            o.push_str(&format!("  - {} [{}] util {:.0}% mem {}", p.name, p.tag, p.util, term::fmt_bytes(g.pmem(p))));
-            if p.name.eq_ignore_ascii_case("vmwp") {
-                o.push_str(" (the WSL2 virtual machine)");
-                if let Some(w) = &s.wsl {
-                    let inner: Vec<String> = w.iter().take(4).map(|w| format!("{} {} [{}]", w.label, w.context(), w.tag)).collect();
-                    if !inner.is_empty() {
-                        o.push_str(&format!("; Linux processes using the GPU: {}", inner.join("; ")));
-                    }
-                }
-            }
-            o.push('\n');
-        }
-    }
-    o
-}
-
-fn jev_questions(s: &Snap, cands: &[headline::Cand], known: &HashMap<String, &'static str>) -> (Vec<jev::Question>, HashMap<String, String>) {
-    let mut qs = vec![];
-    if cands.len() >= 2 {
-        qs.push(jev::Question {
-            key: "headline".into(),
-            instructions: "Pick the one sentence that most accurately and helpfully tells a non-expert what their GPUs are doing right now, given the state. Prefer the sentence that names the workload that actually dominates GPU load.".into(),
-            criteria: cands.iter().map(|c| (c.kind.to_string(), c.text.clone())).collect(),
-        });
-    }
-    // unknown processes worth asking about, once per name
-    let mut asked: HashMap<String, String> = HashMap::new();
-    for g in &s.gpus {
-        let mut ps: Vec<&model::Proc> = g.procs.iter().filter(|p| matches!(p.tag, "other" | "game?") && !p.jev_tag && model::is_active(p, false)).collect();
-        model::sort_procs(g, &mut ps, true);
-        for p in ps {
-            let lname = p.name.to_lowercase();
-            if p.name.starts_with('<') || known.contains_key(&lname) || asked.values().any(|v| *v == lname) || asked.len() >= 6 {
-                continue;
-            }
-            let key = format!("tag_{}", asked.len());
-            let eng: Vec<String> = p.eng.iter().filter(|(_, v)| **v >= 0.5).map(|(k, v)| format!("{k} {v:.0}%")).collect();
-            qs.push(jev::Question {
-                key: key.clone(),
-                instructions: format!(
-                    "Windows process '{}' is using the {} ({} of GPU memory, engines: {}). Which category best describes what this program is?",
-                    p.name,
-                    g.short,
-                    term::fmt_bytes(g.pmem(p)),
-                    if eng.is_empty() { "idle".into() } else { eng.join(", ") }
-                ),
-                criteria: tags::ALL.iter().map(|t| (t.to_string(), tags::describe(t).to_string())).collect(),
-            });
-            asked.insert(key, lname);
-        }
-    }
-    (qs, asked)
-}
-
 fn spawn_jev(tx: &Sender<Msg>, key: String, s: &Snap, known: &HashMap<String, &'static str>, timeout: Duration) -> bool {
-    let cands = headline::candidates(s);
-    let (qs, asked) = jev_questions(s, &cands, known);
-    if qs.is_empty() {
-        return false;
-    }
-    let state = jev_state(s);
+    let Some(job) = collect::jev_job(s, known) else { return false };
     let tx = tx.clone();
     std::thread::spawn(move || {
         let t = Instant::now();
-        let r = jev::ask(&key, &state, &qs, timeout).map(|ans| {
-            let mut out = JevResult { kind: None, tags: HashMap::new() };
-            for (k, a) in ans {
-                if k == "headline" {
-                    out.kind = Some(a.choice);
-                } else if let (Some(name), Some(tag)) = (asked.get(&k), tags::intern(&a.choice)) {
-                    if tag != "other" && a.confidence >= 0.5 {
-                        out.tags.insert(name.clone(), tag);
-                    }
-                }
-            }
-            out
-        });
+        let r = job.run(&key, timeout);
         let _ = tx.send(Msg::Jev(r, t.elapsed()));
     });
     true
@@ -189,6 +39,7 @@ fn spawn_jev(tx: &Sender<Msg>, key: String, s: &Snap, known: &HashMap<String, &'
 /// State that survives between --watch frames.
 struct Session {
     a: args::Args,
+    opts: treecore::gpu::Opts,
     key: Option<String>,
     pdh: win::Counters,
     inp: Inputs,
@@ -222,7 +73,7 @@ impl Session {
     fn lines(&self, width: usize) -> Vec<Line> {
         let s = model::build(&self.inp);
         let h = self.headline(&s);
-        render::render(&s, &self.a, &h, width)
+        render::render(&s, &self.opts, &h, width)
     }
 
     fn refresh_names(&mut self) {
@@ -283,7 +134,7 @@ impl Session {
         let start_wsl = |tx: &Sender<Msg>| {
             let tx = tx.clone();
             std::thread::spawn(move || {
-                let _ = tx.send(Msg::Wsl(wsl_gpu_procs()));
+                let _ = tx.send(Msg::Wsl(collect::wsl_gpu_procs()));
             });
         };
         if !self.a.no_wsl && self.vm_busy() {
@@ -458,6 +309,7 @@ fn main() {
     let inp = Inputs { adapters: win::adapters(), npu: win::npu_name(), ..Default::default() };
     let mut sess = Session {
         key: jev::api_key(),
+        opts: treecore::gpu::Opts { metric_util: a.metric_util, depth: a.depth, top: a.top, group: a.group, all: a.all },
         a: a.clone(),
         pdh,
         inp,

@@ -1,8 +1,8 @@
 //! Turns raw counters + names into the adapter -> process model that gets rendered.
 
-use crate::nvidia::NvStats;
+use super::nvidia::NvStats;
 use crate::tags;
-use crate::win::{Adapter, Raw};
+use super::sys::{Adapter, Raw};
 use std::collections::{BTreeMap, HashMap};
 
 const MIB: f64 = 1024.0 * 1024.0;

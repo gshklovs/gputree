@@ -92,3 +92,45 @@ pub fn ask(key: &str, state: &str, questions: &[Question], timeout: Duration) ->
         })
         .collect())
 }
+
+/// One prepared request: the state text, the questions, and which process name each
+/// `tag_N` question was about.
+pub struct JevJob {
+    pub state: String,
+    pub questions: Vec<Question>,
+    pub asked: HashMap<String, String>,
+}
+
+/// What came back: the chosen headline kind, and name (lowercase) -> tag re-labels.
+#[derive(Clone, Debug, Default)]
+pub struct JevResult {
+    pub kind: Option<String>,
+    pub tags: HashMap<String, &'static str>,
+}
+
+impl JevJob {
+    /// Blocking; run it on a thread.
+    pub fn run(self, key: &str, timeout: Duration) -> Result<JevResult, String> {
+        let ans = ask(key, &self.state, &self.questions, timeout)?;
+        let mut out = JevResult::default();
+        for (k, a) in ans {
+            if k == "headline" {
+                out.kind = Some(a.choice);
+            } else if let (Some(name), Some(tag)) = (self.asked.get(&k), crate::tags::intern(&a.choice)) {
+                if tag != "other" && a.confidence >= 0.5 {
+                    out.tags.insert(name.clone(), tag);
+                }
+            }
+        }
+        Ok(out)
+    }
+}
+
+/// A "which tag is this process" question over the fixed tag list.
+pub fn tag_question(key: String, instructions: String) -> Question {
+    Question {
+        key,
+        instructions,
+        criteria: crate::tags::ALL.iter().map(|t| (t.to_string(), crate::tags::describe(t).to_string())).collect(),
+    }
+}

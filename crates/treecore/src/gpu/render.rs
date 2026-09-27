@@ -1,53 +1,16 @@
-//! Aligned tree layout. Every row shares one column grid:
-//!
-//! ```text
-//! gutter(G)  bar(BAR) mem(MEM) util(UTIL)  name(NAME) tag(TAG) pid
-//! ```
-//!
-//! The gutter has a fixed width for the whole screen; shallower rows extend their
-//! branch with `─` so bars, numbers, names, chips and pids line up at every depth.
+//! gputree's screen: adapter summaries, then processes -> engines / WSL processes,
+//! on the shared grid (`crate::layout`) with cells [mem, util].
 
-use crate::args::Args;
-use crate::headline;
-use crate::model::{Gpu, Proc, Snap, by_tag, is_active, sort_procs};
+use super::Opts;
+use super::headline;
+use super::model::{Gpu, Proc, Snap, by_tag, is_active, sort_procs};
+use crate::layout::{DIM, Headline, Out, Row, layout};
 use crate::tags;
-use crate::term::{Line, bar, fmt_bytes, pad_left, width_of};
+use crate::term::{Line, fmt_bytes};
 
-pub const BAR: usize = 12;
 const MEM: usize = 9;
 const UTIL: usize = 5;
-const DIM: &str = "2";
 const MAG: &str = "35";
-
-struct Row {
-    /// ancestors' continuation marks ("│  " / "   "), 3 columns per level
-    prefix: String,
-    last: bool,
-    bar: Option<f64>,
-    mem: (String, &'static str),
-    util: (String, &'static str),
-    name: Line,
-    /// shorter variants of `name`, tried in order when it does not fit its column
-    alts: Vec<Line>,
-    tag: Option<(&'static str, bool)>,
-    pid: String,
-}
-
-enum Out {
-    Free(Line),
-    /// prose (headline, footnotes): word-wrapped to the width instead of clipped
-    Wrap(Line),
-    /// adapter summary rows: label sits in the gutter, then the normal columns
-    Label { label: &'static str, bar: Option<f64>, mem: (String, &'static str), util: (String, &'static str), rest: Line },
-    Row(Row),
-}
-
-pub struct Headline {
-    pub text: String,
-    /// "" for local, "jev" when Jev picked it
-    pub source: &'static str,
-    pub jev_tags: usize,
-}
 
 fn pct(v: f64) -> String {
     format!("{:.0}%", v.min(100.0))
@@ -57,12 +20,8 @@ fn eng_pct(v: f64) -> String {
     if v < 9.95 { format!("{v:.1}%") } else { format!("{:.0}%", v.min(100.0)) }
 }
 
-fn chip(tag: &str, jev: bool) -> String {
-    if jev { format!("[{tag}]*") } else { format!("[{tag}]") }
-}
-
 struct Ctx<'a> {
-    a: &'a Args,
+    a: &'a Opts,
     s: &'a Snap,
     out: Vec<Out>,
 }
@@ -96,8 +55,7 @@ impl Ctx<'_> {
             prefix: prefix.to_string(),
             last,
             bar: frac,
-            mem: (fmt_bytes(pm), ""),
-            util: self.util_cell(p.util),
+            cells: vec![(fmt_bytes(pm), ""), self.util_cell(p.util)],
             name,
             alts: vec![],
             tag: (!a.group).then_some((p.tag, p.jev_tag)),
@@ -117,8 +75,7 @@ impl Ctx<'_> {
                     prefix: kid_prefix.clone(),
                     last: false,
                     bar: Some(v / 100.0),
-                    mem: (String::new(), ""),
-                    util: (eng_pct(*v), DIM),
+                    cells: vec![(String::new(), ""), (eng_pct(*v), DIM)],
                     name: n,
                     alts: vec![],
                     tag: None,
@@ -138,8 +95,7 @@ impl Ctx<'_> {
                         prefix: kid_prefix.clone(),
                         last: false,
                         bar: None,
-                        mem: (fmt_bytes(w.rss), DIM),
-                        util: (String::new(), ""),
+                        cells: vec![(fmt_bytes(w.rss), DIM), (String::new(), "")],
                         name: n,
                         alts: {
                             let mut a1 = Line::new();
@@ -164,8 +120,7 @@ impl Ctx<'_> {
                 prefix: kid_prefix.clone(),
                 last: false,
                 bar: None,
-                mem: (fmt_bytes(p.shr), DIM),
-                util: (String::new(), ""),
+                cells: vec![(fmt_bytes(p.shr), DIM), (String::new(), "")],
                 name: n,
                 alts: vec![],
                 tag: None,
@@ -186,8 +141,7 @@ impl Ctx<'_> {
             prefix: prefix.to_string(),
             last: true,
             bar: None,
-            mem: (if mem > 0.0 { fmt_bytes(mem) } else { String::new() }, DIM),
-            util: (String::new(), ""),
+            cells: vec![(if mem > 0.0 { fmt_bytes(mem) } else { String::new() }, DIM), (String::new(), "")],
             name: n,
             alts: vec![],
             tag: None,
@@ -223,8 +177,7 @@ impl Ctx<'_> {
         self.out.push(Out::Label {
             label: "mem",
             bar: Some(if g.cap > 0.0 { g.mem / g.cap } else { 0.0 }),
-            mem: (fmt_bytes(g.mem), ""),
-            util: (String::new(), ""),
+            cells: vec![(fmt_bytes(g.mem), ""), (String::new(), "")],
             rest,
         });
         let mut rest = Line::new();
@@ -239,8 +192,7 @@ impl Ctx<'_> {
         self.out.push(Out::Label {
             label: "util",
             bar: Some(if self.s.util_ready { g.util / 100.0 } else { 0.0 }),
-            mem: (String::new(), ""),
-            util: self.util_cell(g.util),
+            cells: vec![(String::new(), ""), self.util_cell(g.util)],
             rest,
         });
 
@@ -255,7 +207,7 @@ impl Ctx<'_> {
             tl.push(DIM, format!(" {}{u}", fmt_bytes(t.mem)));
         }
         if !tl.segs.is_empty() {
-            self.out.push(Out::Label { label: "tags", bar: None, mem: (String::new(), ""), util: (String::new(), ""), rest: tl });
+            self.out.push(Out::Label { label: "tags", bar: None, cells: vec![], rest: tl });
         }
 
         if a.group {
@@ -271,8 +223,7 @@ impl Ctx<'_> {
                     prefix: String::new(),
                     last: last_t,
                     bar: Some(frac),
-                    mem: (fmt_bytes(t.mem), ""),
-                    util: self.util_cell(t.util),
+                    cells: vec![(fmt_bytes(t.mem), ""), self.util_cell(t.util)],
                     name: n,
                     alts: vec![],
                     tag: None,
@@ -322,16 +273,11 @@ impl Ctx<'_> {
 }
 
 /// Lay everything out for a terminal `width` columns wide. No returned line is wider.
-pub fn render(s: &Snap, a: &Args, head: &Headline, width: usize) -> Vec<Line> {
+pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     let mut cx = Ctx { a, s, out: vec![] };
 
     // headline + title
-    let mut h = Line::new();
-    h.push("1", head.text.clone());
-    if head.source == "jev" {
-        h.push(DIM, if head.jev_tags > 0 { format!("  · jev (+{} tag{})", head.jev_tags, if head.jev_tags == 1 { "" } else { "s" }) } else { "  · jev".into() });
-    }
-    cx.out.push(Out::Wrap(h));
+    cx.out.push(Out::Wrap(head.line()));
     let mut t = Line::new();
     t.push("1", "gputree");
     t.push(
@@ -363,164 +309,7 @@ pub fn render(s: &Snap, a: &Args, head: &Headline, width: usize) -> Vec<Line> {
         cx.out.push(Out::Free(f));
     }
 
-    layout(cx.out, width)
-}
-
-fn layout(out: Vec<Out>, width: usize) -> Vec<Line> {
-    // column widths
-    let max_depth = out
-        .iter()
-        .filter_map(|o| if let Out::Row(r) = o { Some(width_of(&r.prefix) / 3) } else { None })
-        .max()
-        .unwrap_or(0);
-    let gutter = (3 * (max_depth + 1)).max(6);
-    let tag_w = out
-        .iter()
-        .filter_map(|o| if let Out::Row(Row { tag: Some((t, j)), .. }) = o { Some(width_of(&chip(t, *j))) } else { None })
-        .max()
-        .unwrap_or(0);
-    let pid_w = out.iter().filter_map(|o| if let Out::Row(r) = o { Some(width_of(&r.pid)) } else { None }).max().unwrap_or(0);
-    // rows without chips/pids (engines, "+ N more", spill notes) may run into the chip column
-    let name_max = out
-        .iter()
-        .filter_map(|o| if let Out::Row(r) = o { (r.tag.is_some() || !r.pid.is_empty()).then(|| r.name.width()) } else { None })
-        .max()
-        .unwrap_or(0);
-    let fixed = gutter + BAR + 1 + MEM + 1 + UTIL + 2;
-    let tail = if tag_w > 0 { 1 + tag_w } else { 0 } + if pid_w > 0 { 2 + pid_w } else { 0 };
-    let name_w = name_max.min(width.saturating_sub(fixed + tail)).max(10);
-
-    let mut lines = vec![];
-    for o in out {
-        let mut l = Line::new();
-        match o {
-            Out::Free(x) => l = x,
-            Out::Wrap(x) => {
-                let mut wrapped = wrap(&x, width, 3);
-                let last = wrapped.pop().unwrap_or_default();
-                lines.extend(wrapped);
-                l = last;
-            }
-            Out::Label { label, bar: b, mem, util, rest } => {
-                l.push(DIM, format!(" {label}"));
-                l.pad_to(gutter);
-                match b {
-                    Some(f) => {
-                        l.append(bar(f, BAR));
-                    }
-                    None => {
-                        // tags line: chips start at the bar column
-                        l.append(rest);
-                        l.truncate(width);
-                        lines.push(l);
-                        continue;
-                    }
-                }
-                l.plain(" ");
-                l.push(mem.1, pad_left(&mem.0, MEM));
-                l.plain(" ");
-                l.push(util.1, pad_left(&util.0, UTIL));
-                l.plain("  ");
-                l.append(rest);
-            }
-            Out::Row(r) => {
-                let pw = width_of(&r.prefix);
-                let fill = gutter.saturating_sub(pw + 2);
-                l.push(DIM, format!("{}{}{} ", r.prefix, if r.last { "└" } else { "├" }, "─".repeat(fill)));
-                match r.bar {
-                    Some(f) => {
-                        l.append(bar(f, BAR));
-                    }
-                    None => {
-                        l.plain(" ".repeat(BAR));
-                    }
-                }
-                l.plain(" ");
-                l.push(r.mem.1, pad_left(&r.mem.0, MEM));
-                l.plain(" ");
-                l.push(r.util.1, pad_left(&r.util.0, UTIL));
-                l.plain("  ");
-                let has_tail = r.tag.is_some() || !r.pid.is_empty();
-                let mut name = r.name;
-                if has_tail && name.width() > name_w {
-                    if let Some(a) = r.alts.into_iter().find(|a| a.width() <= name_w) {
-                        name = a;
-                    }
-                    name.truncate(name_w);
-                }
-                let nw = name.width();
-                l.append(name);
-                if has_tail {
-                    l.plain(" ".repeat(name_w - nw));
-                }
-                if tag_w > 0 && has_tail {
-                    l.plain(" ");
-                    match r.tag {
-                        Some((t, j)) => {
-                            let c = chip(t, j);
-                            let cw = width_of(&c);
-                            l.push(tags::color(t), c);
-                            l.plain(" ".repeat(tag_w - cw));
-                        }
-                        None => {
-                            l.plain(" ".repeat(tag_w));
-                        }
-                    }
-                }
-                if !r.pid.is_empty() {
-                    l.push(DIM, format!("  {}", r.pid));
-                }
-            }
-        }
-        // trim trailing padding, then clip to the terminal
-        while let Some(last) = l.segs.last_mut() {
-            let t = last.text.trim_end().to_string();
-            if t.is_empty() && last.sgr.is_empty() {
-                l.segs.pop();
-                continue;
-            }
-            if last.sgr.is_empty() {
-                last.text = t;
-            }
-            break;
-        }
-        l.truncate(width);
-        lines.push(l);
-    }
-    lines
-}
-
-/// Greedy word wrap that keeps each word's style; at most `max_lines` (the last is clipped).
-fn wrap(x: &Line, width: usize, max_lines: usize) -> Vec<Line> {
-    let mut words: Vec<(String, String)> = vec![]; // (sgr, word incl. leading spaces)
-    for seg in &x.segs {
-        let mut cur = String::new();
-        for ch in seg.text.chars() {
-            if ch == ' ' && !cur.trim().is_empty() {
-                words.push((seg.sgr.clone(), std::mem::take(&mut cur)));
-            }
-            cur.push(ch);
-        }
-        if !cur.is_empty() {
-            words.push((seg.sgr.clone(), cur));
-        }
-    }
-    let mut out: Vec<Line> = vec![Line::new()];
-    for (sgr, w) in words {
-        let n = out.len();
-        let cur = out.last_mut().unwrap();
-        if cur.width() + width_of(&w) > width && cur.width() > 0 && n < max_lines {
-            let mut nl = Line::new();
-            nl.push(&sgr, w.trim_start().to_string());
-            out.push(nl);
-        } else {
-            cur.push(&sgr, w);
-        }
-    }
-    for l in &mut out {
-        l.truncate(width);
-    }
-    out
+    layout(cx.out, width, &[MEM, UTIL])
 }
 
 /// The instant, local headline (first template), or a sampling note before util exists.
@@ -536,7 +325,8 @@ pub fn local_headline(s: &Snap) -> Headline {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Gpu, Proc, Snap, WslProc};
+    use super::super::model::{Gpu, Proc, Snap, WslProc};
+    use crate::term::width_of;
     use std::collections::BTreeMap;
 
     fn fixture() -> Snap {
@@ -571,20 +361,8 @@ mod tests {
         Snap { gpus: vec![g], util_ready: true, wsl: Some(vec![w]), time: "12:00:00".into() }
     }
 
-    fn args() -> crate::args::Args {
-        crate::args::Args {
-            metric_util: false,
-            depth: 3,
-            watch: 0.0,
-            top: 10,
-            group: false,
-            all: false,
-            no_wsl: false,
-            no_ai: true,
-            width: None,
-            no_color: true,
-            timing: false,
-        }
+    fn args() -> Opts {
+        Opts { metric_util: false, depth: 3, top: 10, group: false, all: false }
     }
 
     #[test]

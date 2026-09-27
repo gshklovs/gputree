@@ -37,6 +37,10 @@ WSL rows: Linux processes holding /dev/dxg (host RAM shown). They share one VM, 
 In a terminal the bars are smooth eighth-blocks on a dim track and the tags are
 coloured; piped, it prints plain text once.
 
+The same repo builds **cputree**, the same idea for the CPU: the real process
+tree with CPU and memory rolled up to parents, and the WSL2 VM opened up into
+the Linux processes inside it (see [cputree](#cputree)).
+
 It is the Windows counterpart of [disktree](https://github.com/tobi/disktree)'s
 idea — a disk treemap — applied to GPU memory and time, and a native port of an
 older PowerShell script (kept in [`legacy/`](legacy/)). The script took about
@@ -57,6 +61,7 @@ git clone https://github.com/gshklovs/gputree
 cd gputree
 cargo build --release
 copy target\release\gputree.exe $HOME\bin\     # anywhere on PATH
+copy target\release\cputree.exe $HOME\bin
 ```
 
 With rustup's `x86_64-pc-windows-gnu` host (no Visual Studio needed), the
@@ -130,6 +135,83 @@ If the output is taller than the window, the in-between frames are skipped and
 the final one is drawn. In `--watch`, each frame's utilisation covers the whole
 interval since the last one.
 
+## cputree
+
+```
+CPU is 16% busy — mostly your training run in WSL (11%) and MsMpEng (1%).  · jev
+cputree  24 logical CPUs · 31.4 GiB RAM · ranked by cpu · 13:10:43
+
+ cpu              █▉··········   16%                  user 1% · kernel 14%
+ cores            ▅▅▂▁▁▁▁▁▁▁▁▄▁▆▁▁▁▁▁▁▂▁▄▂
+ mem              ████████····              21.1 GiB  of 31.4 GiB (67%)
+ tags             [training] 11% 5.1 GiB  [system] 0.4% 1.7 GiB  [other] 0.4% 261 MiB  [app] 0.2% 2.5 G…
+
+                                Σcpu   own      Σmem  process tree
+├──────────────── █▍··········   11%    0%   6.6 GiB  wininit                     [system]    pid 1976
+│  ├───────────── █▍··········   11%    0%   6.6 GiB  services                    [system]    pid 1148
+│  │  ├────────── █▍··········   11%    0%   5.1 GiB  vmcompute                   [other]     pid 3252
+│  │  │  └─────── █▍··········   11%    0%   5.1 GiB  vmwp (WSL2 VM)              [training]  pid 36088
+│  │  │     └──── █▍··········   11%   11%   5.1 GiB  vmmemWSL (WSL2 VM)          [training]  pid 16148
+│  │  │        ├─ ▌···········    4%    4%   2.7 GiB  train bd1-walk-flat         [training]  pid 103308
+│  │  │        ├─ ············    0%    0%    90 MiB  server --logdir=logs/rsl_r… [training]  pid 6974
+│  │  │        └─ ············    0%    0%    85 MiB  tensorboard --logdir bd1_w… [training]  pid 6949
+│  │  ├────────── ············  0.2%  0.2%   337 MiB  MsMpEng                     [system]    pid 5692
+│  │  ├────────── ············    0%    0%   930 MiB  svchost ×93                 [system]    93 procs
+│  │  ├────────── ············    0%    0%    67 MiB  tailscaled                  [other]     pid 6280
+│  │  ├────────── ············    0%    0%    15 MiB  nvcontainer                 [other]     pid 5500
+│  │  ├────────── ············    0%    0%    14 MiB  ArmouryCrate.Service        [other]     pid 5156
+│  │  ├────────── ············    0%    0%    12 MiB  SearchIndexer               [system]    pid 10780
+│  │  ├────────── ············    0%    0%    12 MiB  NVDisplay.Container         [other]     pid 3852
+│  │  └──────────                 0%          70 MiB  + 45 more processes (--all to list)
+│  ├───────────── ············    0%    0%     7 MiB  lsass                       [system]    pid 1356
+│  ├───────────── ············    0%    0%    44 KiB  LsaIso                      [system]    pid 1364
+│  └───────────── ············    0%    0%    24 KiB  fontdrvhost                 [system]    pid 2200
+├──────────────── ▏···········  0.9%    0%   4.4 GiB  explorer                    [desktop]   pid 14416
+│  ├───────────── ▏···········  0.9%    0%   4.2 GiB  WindowsTerminal             [terminal]  pid 15644
+```
+
+disktree semantics, for processes: a row's **Σcpu** and **Σmem** are its whole
+subtree (itself plus every descendant), like a directory's size; **own** is the
+process alone. Rows are sorted by the subtree total, largest first, with
+`+ N more` for the rest.
+
+- **The real tree.** Parents come from the process list itself; a parent must
+  have started before its child, so a reused pid never adopts strangers, and a
+  process whose parent is gone is a root.
+- **Merged siblings.** Same-name siblings become one row, `chrome ×42`, with
+  summed numbers and all of their children underneath; `--all` lists them one
+  by one.
+- **WSL.** The VM's host process (`vmmemWSL`, else `vmmem`, else `vmwp`) opens
+  into the busiest Linux processes of every running distro, measured inside
+  the distro: `/proc/*/stat` read twice 300 ms apart, one `wsl.exe` call per
+  distro, with the same base64-wrapped read-only script approach and the same
+  shortened commands as gputree. Unlike GPU time, Linux CPU is attributable
+  per process, so these rows have real numbers (as a share of all Windows
+  logical CPUs, so they compare directly). The chain of parents down to the VM
+  is always expanded, whatever `--depth` says.
+- **Header.** Overall CPU with the user/kernel split, one character per logical
+  CPU (wrapped to the width), RAM in use, and the tag rollup. CPU temperature
+  is not shown: Windows only exposes it through WMI/ACPI, which is neither
+  cheap nor reliable.
+- **Same tags, same headline.** The gputree rules, plus: anything else under
+  `C:\Windows\` and the well-known service hosts are `system`, and shells are
+  `terminal`. The headline ("CPU is 38% busy — mostly your training run in WSL
+  (22%) and Chrome (9%).") is built the same way, and Jev picks among the
+  candidates and re-tags the busiest unknown processes the same way.
+- **Same speed.** One `NtQuerySystemInformation` call returns every process
+  with its parent, start time, CPU time and private working set: the first
+  frame is drawn in ~15 ms with `…` for CPU, a second sample 300 ms later fills
+  it in, and WSL (~0.45 s) and Jev land after.
+
+| flag | does |
+| --- | --- |
+| `-m`, `--metric cpu\|mem` | rank by CPU (default) or memory |
+| `-d`, `--depth N` | tree levels shown, 1-12 (default 4) |
+| `-n`, `--top N` | children shown per node (default 8) |
+| `-g`, `--group` | tag → process instead of the tree |
+| `-a`, `--all` | no merging, no limits |
+| `-w`, `--watch N`, `--no-wsl`, `--no-ai`, `--width N`, `--no-color` | as in gputree |
+
 ## Tags
 
 Every process gets one tag from its name, image path and (for WSL) command
@@ -149,7 +231,7 @@ line, then from its engines:
 | `other` | none of the above |
 
 The WSL2 VM (`vmwp`) takes the tag of its busiest Linux workload. The rules
-are in [`src/tags.rs`](src/tags.rs), a port of the script's `Get-Tag`.
+are in [`crates/treecore/src/tags.rs`](crates/treecore/src/tags.rs), a port of the script's `Get-Tag`.
 
 ## The Jev headline
 
@@ -198,18 +280,20 @@ but through the Perflib V2 consumer API (`PerfOpenQueryHandle`,
 ```sh
 cargo test               # layout (alignment, never wider than the terminal), shortening
 cargo build --release
-gputree --timing         # phase timings on stderr
+gputree --timing         # phase timings on stderr (cputree too)
 ```
+
+A cargo workspace:
 
 | path | what lives there |
 | --- | --- |
-| `src/win.rs` | GPU counters (Perflib V2), registry, process list |
-| `src/model.rs` | counters + names → adapters → processes |
-| `src/tags.rs` | the tag rules |
-| `src/render.rs` | the aligned tree layout |
-| `src/term.rs` | styled, width-safe lines, bars, in-place redraw |
-| `src/headline.rs`, `src/jev.rs` | the sentence on top and the Jev call |
-| `src/wsl.rs`, `src/nvidia.rs` | WSL and NVIDIA |
+| `crates/treecore` | the shared library: data collection, tags, Jev, the terminal grid |
+| `crates/treecore/src/gpu/` | GPU counters (Perflib V2), registry, NVML, model, headline, screen |
+| `crates/treecore/src/cpu/` | process snapshot (`NtQuerySystemInformation`), tree + roll-up, WSL CPU sampling, headline, screen |
+| `crates/treecore/src/layout.rs` | the aligned grid both screens are drawn on |
+| `crates/treecore/src/term.rs` | styled, width-safe lines, bars, in-place redraw |
+| `crates/treecore/src/{tags,jev,wsl}.rs` | tag rules, the Jev call, running scripts inside WSL |
+| `crates/gputree`, `crates/cputree` | the two command-line tools (flags, progressive frames) |
 | `legacy/` | the original PowerShell version |
 
 ## License
