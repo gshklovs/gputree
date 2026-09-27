@@ -1,0 +1,22 @@
+Music used in the gputree launch video (gputree-launch.mp4)
+
+Track:   "Windows Down" (file "Windows Down.mp3")
+Artist:  HoliznaCC0
+Album:   Lazy Summer Lofi
+Source:  https://freemusicarchive.org/music/holiznacc0/lazy-summer-lofi-1/windows-downmp3/
+License: CC0 1.0 Universal (public domain dedication)
+         https://creativecommons.org/publicdomain/zero/1.0/
+
+License statement shown on the track page (verified 2026-09-27):
+  "Windows Down.mp3 by HoliznaCC0 is licensed under a CC0 1.0 Universal License."
+
+CC0 1.0 summary (from https://creativecommons.org/publicdomain/zero/1.0/):
+  The person who associated a work with this deed has dedicated the work to the
+  public domain by waiving all of his or her rights to the work worldwide under
+  copyright law, including all related and neighboring rights, to the extent
+  allowed by law. You can copy, modify, distribute and perform the work, even for
+  commercial purposes, all without asking permission. No attribution required.
+
+Edit used: 85.12 s - 109.12 s of the track (24 s), measured at 107.7 BPM;
+a low-pass filter during the "offline" beat, fades in/out, loudness-normalised
+to -14 LUFS integrated.
