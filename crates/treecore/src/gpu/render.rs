@@ -24,6 +24,7 @@ struct Ctx<'a> {
     a: &'a Opts,
     s: &'a Snap,
     out: Vec<Out>,
+    spill: bool,
 }
 
 /// How much of the screen to draw: processes per adapter (in drawing order) and
@@ -31,6 +32,8 @@ struct Ctx<'a> {
 struct Budget {
     tops: Vec<usize>,
     notes: bool,
+    /// the "+ spilled to shared memory" rows
+    spill: bool,
 }
 
 impl Ctx<'_> {
@@ -121,7 +124,7 @@ impl Ctx<'_> {
                 }
             }
         }
-        if a.depth >= 3 && !g.integrated && p.shr >= 1048576.0 {
+        if self.spill && a.depth >= 3 && !g.integrated && p.shr >= 1048576.0 {
             let mut n = Line::new();
             n.push(DIM, "+ spilled to shared memory");
             kids.push(Row {
@@ -282,20 +285,21 @@ impl Ctx<'_> {
 
 /// Lay everything out for a terminal `width` columns wide. No returned line is wider.
 pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
-    render_with(s, a, head, width, &Budget { tops: vec![a.top; s.gpus.len()], notes: true })
+    render_with(s, a, head, width, &Budget { tops: vec![a.top; s.gpus.len()], notes: true, spill: true })
 }
 
 /// Like `render`, but at most `max_lines` tall (for a terminal screen), so the
 /// progressive redraw can happen in place. It keeps the headline, every adapter's
 /// summary and the busiest rows, and folds the rest into "+ N more" rows, giving up
 /// detail from the least busy adapters first (their process rows), then the footnotes,
-/// then the busiest adapter's engine rows, then its processes. `--all` is never folded.
+/// then the spill notes, then the busiest adapter's engine rows, then its processes.
+/// `--all` is never folded.
 pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: usize) -> Vec<Line> {
     let full = render(s, a, head, width);
     if a.all || full.len() <= max_lines {
         return full;
     }
-    let mut b = Budget { tops: vec![a.top; s.gpus.len()], notes: true };
+    let mut b = Budget { tops: vec![a.top; s.gpus.len()], notes: true, spill: true };
     let mut o = a.clone();
     let fits = |o: &Opts, b: &Budget| {
         let l = render_with(s, o, head, width, b);
@@ -304,7 +308,10 @@ pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: 
     // fold order: least busy adapter first (ties: the one drawn lower first)
     let drawn = draw_order(s, a);
     let mut fold: Vec<usize> = (0..drawn.len()).collect();
-    fold.sort_by(|&i, &j| drawn[i].util.total_cmp(&drawn[j].util).then(j.cmp(&i)));
+    // (before util is sampled everything ties at 0: fold integrated adapters before discrete ones)
+    fold.sort_by(|&i, &j| {
+        drawn[i].util.total_cmp(&drawn[j].util).then(drawn[j].integrated.cmp(&drawn[i].integrated)).then(j.cmp(&i))
+    });
     let keep = fold.pop().unwrap_or(0);
     for i in fold {
         while b.tops[i] > 0 {
@@ -315,6 +322,10 @@ pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: 
         }
     }
     b.notes = false;
+    if let Some(l) = fits(&o, &b) {
+        return l;
+    }
+    b.spill = false;
     if let Some(l) = fits(&o, &b) {
         return l;
     }
@@ -343,7 +354,7 @@ fn draw_order<'a>(s: &'a Snap, a: &Opts) -> Vec<&'a Gpu> {
 }
 
 fn render_with(s: &Snap, a: &Opts, head: &Headline, width: usize, budget: &Budget) -> Vec<Line> {
-    let mut cx = Ctx { a, s, out: vec![] };
+    let mut cx = Ctx { a, s, out: vec![], spill: budget.spill };
 
     // headline + title
     cx.out.push(Out::Wrap(head.line()));
