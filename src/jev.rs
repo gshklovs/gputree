@@ -1,0 +1,94 @@
+//! TypeSafe's Jev API: typed multiple-choice answers about a text state.
+//! Called through Windows' built-in curl.exe (schannel TLS, no C toolchain needed).
+//! The key is passed on curl's stdin config, never on a command line.
+
+use serde_json::{Map, Value, json};
+use std::collections::HashMap;
+use std::io::Write;
+use std::os::windows::process::CommandExt;
+use std::process::{Command, Stdio};
+use std::time::Duration;
+
+pub const ENDPOINT: &str = "https://api.typesafe.ai/v1/systemone";
+
+pub struct Question {
+    pub key: String,
+    pub instructions: String,
+    /// option id -> description
+    pub criteria: Vec<(String, String)>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Answer {
+    pub choice: String,
+    pub confidence: f64,
+}
+
+pub fn api_key() -> Option<String> {
+    ["JEV_API_KEY", "TYPESAFE_API_KEY"].iter().find_map(|k| std::env::var(k).ok().filter(|v| !v.trim().is_empty()))
+}
+
+fn curl_quote(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    o.push('"');
+    for ch in s.chars() {
+        match ch {
+            '\\' => o.push_str("\\\\"),
+            '"' => o.push_str("\\\""),
+            '\n' => o.push_str("\\n"),
+            '\r' => o.push_str("\\r"),
+            '\t' => o.push_str("\\t"),
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+/// One batched request. Returns question key -> answer, or an error string.
+pub fn ask(key: &str, state: &str, questions: &[Question], timeout: Duration) -> Result<HashMap<String, Answer>, String> {
+    let mut qs = Map::new();
+    for q in questions {
+        let crit: Map<String, Value> = q.criteria.iter().map(|(k, v)| (k.clone(), Value::String(v.clone()))).collect();
+        qs.insert(q.key.clone(), json!({"type": "choice", "instructions": q.instructions, "criteria": crit}));
+    }
+    let body = json!({"state": state, "model": "jev-latest", "questions": qs}).to_string();
+    let secs = timeout.as_secs_f64().max(0.5);
+    let config = format!(
+        "url = {}\nheader = {}\nheader = \"Content-Type: application/json\"\ndata-binary = {}\nmax-time = {secs:.1}\nsilent\n",
+        curl_quote(ENDPOINT),
+        curl_quote(&format!("Authorization: Bearer {}", key.trim())),
+        curl_quote(&body),
+    );
+    let curl = std::env::var("SystemRoot").map(|r| format!(r"{r}\System32\curl.exe")).unwrap_or("curl.exe".into());
+    let mut child = Command::new(curl)
+        .args(["-K", "-", "-w", "\n%{http_code}"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .creation_flags(crate::CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| format!("curl: {e}"))?;
+    child.stdin.take().ok_or("curl stdin")?.write_all(config.as_bytes()).map_err(|e| format!("curl stdin: {e}"))?;
+    let out = child.wait_with_output().map_err(|e| format!("curl: {e}"))?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let (payload, code) = text.rsplit_once('\n').unwrap_or(("", &text));
+    if code.trim() != "200" {
+        let code = if code.trim() == "000" { "timeout / network" } else { code.trim() };
+        return Err(format!("HTTP {code}"));
+    }
+    let v: Value = serde_json::from_str(payload).map_err(|e| format!("bad json: {e}"))?;
+    let answers = v.get("answers").and_then(Value::as_object).ok_or("no answers")?;
+    Ok(answers
+        .iter()
+        .filter_map(|(k, a)| {
+            Some((
+                k.clone(),
+                Answer {
+                    choice: a.get("choice")?.as_str()?.to_string(),
+                    confidence: a.get("confidence").and_then(Value::as_f64).unwrap_or(0.0),
+                },
+            ))
+        })
+        .collect())
+}
