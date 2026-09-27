@@ -40,8 +40,9 @@ impl Ctx<'_> {
         let pm = g.pmem(p);
         let frac = if a.metric_util {
             if self.s.util_ready { Some(p.util / 100.0) } else { Some(0.0) }
-        } else if g.mem > 0.0 {
-            Some(pm / g.mem)
+        } else if g.scale() > 0.0 {
+            // bar width = the adapter's capacity, fill = what this process uses
+            Some(pm / g.scale())
         } else {
             Some(0.0)
         };
@@ -58,7 +59,7 @@ impl Ctx<'_> {
             prefix: prefix.to_string(),
             last,
             bar: frac,
-            cells: vec![(fmt_bytes(pm), ""), self.util_cell(p.util)],
+            cells: vec![(if g.integrated && p.adjusted { format!("~{}", fmt_bytes(pm)) } else { fmt_bytes(pm) }, ""), self.util_cell(p.util)],
             name,
             alts: vec![],
             tag: (!a.group).then_some((p.tag, p.jev_tag)),
@@ -218,7 +219,7 @@ impl Ctx<'_> {
             let rest_n: usize = groups.iter().filter(|t| !(a.all || t.mem >= 1048576.0 || t.util >= 0.1)).map(|t| t.procs.len()).sum();
             for (i, t) in shown.iter().enumerate() {
                 let last_t = i + 1 == shown.len() && rest_n == 0;
-                let frac = if a.metric_util { t.util / 100.0 } else if g.mem > 0.0 { t.mem / g.mem } else { 0.0 };
+                let frac = if a.metric_util { t.util / 100.0 } else if g.scale() > 0.0 { t.mem / g.scale() } else { 0.0 };
                 let mut n = Line::new();
                 n.push(tags::color(t.tag), format!("[{}]", t.tag));
                 let np = t.procs.len();
@@ -315,6 +316,11 @@ pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
         f.push(DIM, "WSL rows: Linux processes holding /dev/dxg (host RAM shown). They share one VM, so their GPU % is the VM's total.");
         cx.out.push(Out::Wrap(f));
     }
+    if s.gpus.iter().any(|g| g.integrated && g.procs.iter().any(|p| p.adjusted)) {
+        let mut f = Line::new();
+        f.push(DIM, "~ shared memory scaled to fit the adapter: Windows counts pages several processes map once per process.");
+        cx.out.push(Out::Wrap(f));
+    }
     if head.jev_tags > 0 {
         let mut f = Line::new();
         f.push(DIM, "* tag chosen by Jev");
@@ -345,8 +351,8 @@ mod tests {
         let mut eng = BTreeMap::new();
         eng.insert("3d".to_string(), 55.0);
         eng.insert("copy".to_string(), 1.2);
-        let vm = Proc { luid: 1, pid: 36088, name: "vmwp".into(), ded: 3.2e9, shr: 8e7, eng: eng.clone(), util: 55.0, tag: "training", jev_tag: false };
-        let sys = Proc { luid: 1, pid: 4, name: "System".into(), ded: 4e6, shr: 0.0, eng: BTreeMap::new(), util: 0.0, tag: "system", jev_tag: false };
+        let vm = Proc { luid: 1, pid: 36088, name: "vmwp".into(), ded: 3.2e9, shr: 8e7, eng: eng.clone(), util: 55.0, tag: "training", jev_tag: false, shr_raw: 0.0, adjusted: false };
+        let sys = Proc { luid: 1, pid: 4, name: "System".into(), ded: 4e6, shr: 0.0, eng: BTreeMap::new(), util: 0.0, tag: "system", jev_tag: false, shr_raw: 0.0, adjusted: false };
         let g = Gpu {
             luid: 1,
             name: "NVIDIA GeForce RTX 5060 Laptop GPU".into(),
@@ -393,6 +399,8 @@ mod tests {
             util: 45.0,
             tag: "training",
             jev_tag: false,
+            shr_raw: 0.0,
+            adjusted: false,
         }];
         let h = local_headline(&s);
         assert!(h.text.contains("train bd1-walk-flat, WSL"), "{}", h.text);

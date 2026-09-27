@@ -30,6 +30,10 @@ pub struct Proc {
     pub tag: &'static str,
     /// tag came from Jev rather than the local rules
     pub jev_tag: bool,
+    /// Shared usage as Windows reported it, before the integrated-GPU correction.
+    pub shr_raw: f64,
+    /// `shr` was scaled down to fit the adapter (see `fit_shared`).
+    pub adjusted: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -77,6 +81,12 @@ pub struct Gpu {
 impl Gpu {
     pub fn pmem(&self, p: &Proc) -> f64 {
         if self.integrated { p.shr } else { p.ded }
+    }
+
+    /// What a full memory bar means: the adapter's capacity (dedicated VRAM, or the
+    /// shared-memory budget for an iGPU), or what's in use when capacity is unknown (NPU).
+    pub fn scale(&self) -> f64 {
+        if self.cap > 0.0 { self.cap } else { self.mem }
     }
 }
 
@@ -140,7 +150,7 @@ pub fn build(inp: &Inputs) -> Snap {
                     jev_tag = true;
                 }
             }
-            Proc { luid, pid, name, ded: r.ded, shr: r.shr, eng: r.eng.clone(), util, tag, jev_tag }
+            Proc { luid, pid, name, ded: r.ded, shr: r.shr, eng: r.eng.clone(), util, tag, jev_tag, shr_raw: r.shr, adjusted: false }
         })
         .collect();
 
@@ -166,10 +176,13 @@ pub fn build(inp: &Inputs) -> Snap {
         if a.is_some_and(|a| a.name.starts_with("Microsoft Basic Render")) {
             continue;
         }
-        let mine: Vec<Proc> = procs.iter().filter(|p| p.luid == l).cloned().collect();
+        let mut mine: Vec<Proc> = procs.iter().filter(|p| p.luid == l).cloned().collect();
         let integrated = a.is_none_or(|a| a.total <= 512.0 * MIB);
         let npu = a.is_none();
         let mem = raw.adapter_mem.get(&l).map(|&(d, s)| if integrated { s } else { d }).unwrap_or(0.0);
+        if integrated {
+            fit_shared(&mut mine, mem);
+        }
         let cap = a.map(|a| if integrated { a.shared } else { a.total }).unwrap_or(0.0);
         let mut eng: BTreeMap<String, f64> = BTreeMap::new();
         for p in &mine {
@@ -195,6 +208,23 @@ pub fn build(inp: &Inputs) -> Snap {
         }
     }
     Snap { gpus, util_ready: raw.util_ready, wsl: inp.wsl.clone(), time: inp.time.clone() }
+}
+
+/// Windows' per-process "Shared Usage" counts pages several processes map (dwm
+/// maps everyone's surfaces), so on an integrated GPU the per-process numbers can
+/// add up to far more than the adapter's own total. Cap each at the adapter's
+/// total and, if they still add up to more, scale them down together.
+pub fn fit_shared(procs: &mut [Proc], total: f64) {
+    if total <= 0.0 {
+        return;
+    }
+    let sum: f64 = procs.iter().map(|p| p.shr_raw.min(total)).sum();
+    let scale = if sum > total { total / sum } else { 1.0 };
+    for p in procs.iter_mut() {
+        let v = p.shr_raw.min(total) * scale;
+        p.adjusted = p.shr_raw > 0.0 && (p.shr_raw - v) > p.shr_raw * 0.01;
+        p.shr = v;
+    }
 }
 
 /// Per-tag rollup for one adapter: (tag, mem, util, procs), largest first by metric.
@@ -235,4 +265,27 @@ pub fn sort_procs(g: &Gpu, v: &mut [&Proc], metric_util: bool) {
 
 pub fn is_active(p: &Proc, all: bool) -> bool {
     all || p.util >= 0.1 || (p.ded + p.shr) >= MIB
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn p(pid: u32, shr: f64) -> Proc {
+        Proc { luid: 1, pid, name: "x".into(), ded: 0.0, shr, eng: BTreeMap::new(), util: 0.0, tag: "other", jev_tag: false, shr_raw: shr, adjusted: false }
+    }
+
+    #[test]
+    fn shared_usage_never_exceeds_the_adapter() {
+        let gib = 1024.0 * 1024.0 * 1024.0;
+        let mut v = vec![p(1, 8.1 * gib), p(2, 0.7 * gib), p(3, 0.2 * gib)];
+        fit_shared(&mut v, 3.0 * gib);
+        let sum: f64 = v.iter().map(|p| p.shr).sum();
+        assert!((sum - 3.0 * gib).abs() < 1.0, "{sum}");
+        assert!(v.iter().all(|p| p.shr <= 3.0 * gib && p.adjusted));
+        // already consistent: untouched
+        let mut ok = vec![p(1, gib), p(2, gib)];
+        fit_shared(&mut ok, 3.0 * gib);
+        assert!(ok.iter().all(|p| !p.adjusted && p.shr == gib));
+    }
 }
