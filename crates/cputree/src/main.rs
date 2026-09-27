@@ -20,6 +20,8 @@ const CPU_WINDOW: Duration = Duration::from_millis(300);
 const DEADLINE: Duration = Duration::from_millis(2200);
 /// Start Jev without WSL names if WSL has not answered by then.
 const JEV_LATEST_START: Duration = Duration::from_millis(1100);
+/// In --watch, re-ask WSL at most this often; frames in between reuse the last answer.
+const WSL_REFRESH: Duration = Duration::from_secs(2);
 
 enum Msg {
     Wsl(Vec<LinuxProc>),
@@ -45,6 +47,7 @@ struct Session {
     jev_kind: Option<String>,
     jev_sig: String,
     jev_at: Option<Instant>,
+    wsl_at: Option<Instant>,
     timing: Vec<(String, Duration)>,
     start: Instant,
     frames: u32,
@@ -91,12 +94,18 @@ impl Session {
         }
         self.frames += 1;
         self.inp.fill_paths();
-        self.inp.wsl = None;
+        // later --watch frames draw over the previous frame's WSL rows instead of
+        // blanking them until wsl.exe answers (that blank-then-refill was the jitter)
+        if self.frames == 1 || !self.has_vm() {
+            self.inp.wsl = None;
+        }
         mark(self, "phase1 data");
 
         let mut pending = 0usize;
         let mut wsl_started = false;
-        if !self.a.no_wsl && self.has_vm() {
+        let wsl_due = self.wsl_at.is_none_or(|t| t.elapsed() >= WSL_REFRESH);
+        if !self.a.no_wsl && wsl_due && self.has_vm() {
+            self.wsl_at = Some(Instant::now());
             let tx = tx.clone();
             let n = treecore::cpu::sys::ncpu();
             std::thread::spawn(move || {
@@ -250,6 +259,7 @@ fn main() {
         jev_kind: None,
         jev_sig: String::new(),
         jev_at: None,
+        wsl_at: None,
         timing: vec![("first sample".into(), t_sample)],
         start: t_start,
         frames: 0,

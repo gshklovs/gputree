@@ -18,6 +18,8 @@ const UTIL_WINDOW: Duration = Duration::from_millis(280);
 const DEADLINE: Duration = Duration::from_millis(2200);
 /// Start Jev without WSL names if WSL has not answered by then.
 const JEV_LATEST_START: Duration = Duration::from_millis(1100);
+/// In --watch, re-ask WSL at most this often; frames in between reuse the last answer.
+const WSL_REFRESH: Duration = Duration::from_secs(2);
 
 enum Msg {
     Nv(Vec<nvidia::NvStats>),
@@ -46,6 +48,7 @@ struct Session {
     jev_kind: Option<String>,
     jev_sig: String,
     jev_at: Option<Instant>,
+    wsl_at: Option<Instant>,
     timing: Vec<(String, Duration)>,
     start: Instant,
     frames: u32,
@@ -115,7 +118,11 @@ impl Session {
         self.inp.raw = self.pdh.read();
         self.inp.time = win::local_time();
         self.refresh_names();
-        self.inp.wsl = None;
+        // later --watch frames draw over the previous frame's WSL rows instead of
+        // blanking them until wsl.exe answers (that blank-then-refill was the jitter)
+        if self.frames == 1 || !self.vm_busy() {
+            self.inp.wsl = None;
+        }
         mark(self, "phase1 data");
 
         let mut pending = 0;
@@ -131,15 +138,17 @@ impl Session {
             self.inp.nv = None;
         }
         let mut wsl_started = false;
+        let wsl_due = self.wsl_at.is_none_or(|t| t.elapsed() >= WSL_REFRESH);
         let start_wsl = |tx: &Sender<Msg>| {
             let tx = tx.clone();
             std::thread::spawn(move || {
                 let _ = tx.send(Msg::Wsl(collect::wsl_gpu_procs()));
             });
         };
-        if !self.a.no_wsl && self.vm_busy() {
+        if !self.a.no_wsl && wsl_due && self.vm_busy() {
             start_wsl(&tx);
             wsl_started = true;
+            self.wsl_at = Some(Instant::now());
             pending += 1;
         }
 
@@ -178,9 +187,10 @@ impl Session {
         }
         draw(self, painter, false);
         mark(self, "phase2 drawn");
-        if !wsl_started && !self.a.no_wsl && self.vm_busy() {
+        if !wsl_started && !self.a.no_wsl && wsl_due && self.vm_busy() {
             start_wsl(&tx);
             wsl_started = true;
+            self.wsl_at = Some(Instant::now());
             pending += 1;
         }
 
@@ -316,6 +326,7 @@ fn main() {
         jev_kind: None,
         jev_sig: String::new(),
         jev_at: None,
+        wsl_at: None,
         timing: vec![("counters open + first sample".into(), t_pdh), ("registry".into(), t_start.elapsed())],
         start: t_start,
         frames: 0,

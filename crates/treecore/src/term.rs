@@ -191,6 +191,9 @@ pub fn columns(over: Option<usize>) -> usize {
 }
 
 pub fn rows() -> usize {
+    if let Some(h) = std::env::var("LINES").ok().and_then(|v| v.parse::<usize>().ok()) {
+        return h.max(5);
+    }
     crossterm::terminal::size().map(|(_, h)| h as usize).unwrap_or(50)
 }
 
