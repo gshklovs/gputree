@@ -288,8 +288,8 @@ pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
 /// Like `render`, but at most `max_lines` tall (for a terminal screen), so the
 /// progressive redraw can happen in place. It keeps the headline, every adapter's
 /// summary and the busiest rows, and folds the rest into "+ N more" rows, giving up
-/// detail from the bottom: later adapters' process rows first, then the footnotes,
-/// then the first adapter's engine rows, then its processes. `--all` is never folded.
+/// detail from the least busy adapters first (their process rows), then the footnotes,
+/// then the busiest adapter's engine rows, then its processes. `--all` is never folded.
 pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: usize) -> Vec<Line> {
     let full = render(s, a, head, width);
     if a.all || full.len() <= max_lines {
@@ -301,7 +301,12 @@ pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: 
         let l = render_with(s, o, head, width, b);
         (l.len() <= max_lines).then_some(l)
     };
-    for i in (1..b.tops.len()).rev() {
+    // fold order: least busy adapter first (ties: the one drawn lower first)
+    let drawn = draw_order(s, a);
+    let mut fold: Vec<usize> = (0..drawn.len()).collect();
+    fold.sort_by(|&i, &j| drawn[i].util.total_cmp(&drawn[j].util).then(j.cmp(&i)));
+    let keep = fold.pop().unwrap_or(0);
+    for i in fold {
         while b.tops[i] > 0 {
             b.tops[i] -= 1;
             if let Some(l) = fits(&o, &b) {
@@ -319,8 +324,8 @@ pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: 
             return l;
         }
     }
-    while b.tops.first().is_some_and(|t| *t > 0) {
-        b.tops[0] -= 1;
+    while b.tops.get(keep).is_some_and(|t| *t > 0) {
+        b.tops[keep] -= 1;
         if let Some(l) = fits(&o, &b) {
             return l;
         }
@@ -328,6 +333,13 @@ pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: 
     let mut l = render_with(s, &o, head, width, &b);
     l.truncate(max_lines);
     l
+}
+
+/// Adapters in drawing order: by memory (or util with --metric util), largest first.
+fn draw_order<'a>(s: &'a Snap, a: &Opts) -> Vec<&'a Gpu> {
+    let mut gpus: Vec<&Gpu> = s.gpus.iter().collect();
+    gpus.sort_by(|x, y| if a.metric_util { y.util.total_cmp(&x.util) } else { y.mem.total_cmp(&x.mem) });
+    gpus
 }
 
 fn render_with(s: &Snap, a: &Opts, head: &Headline, width: usize, budget: &Budget) -> Vec<Line> {
@@ -349,9 +361,7 @@ fn render_with(s: &Snap, a: &Opts, head: &Headline, width: usize, budget: &Budge
     );
     cx.out.push(Out::Free(t));
 
-    let mut gpus: Vec<&Gpu> = s.gpus.iter().collect();
-    gpus.sort_by(|x, y| if a.metric_util { y.util.total_cmp(&x.util) } else { y.mem.total_cmp(&x.mem) });
-    for (i, g) in gpus.into_iter().enumerate() {
+    for (i, g) in draw_order(s, a).into_iter().enumerate() {
         cx.adapter(g, budget.tops.get(i).copied().unwrap_or(a.top));
     }
     if budget.notes && s.wsl.as_ref().is_some_and(|w| !w.is_empty()) {
@@ -458,6 +468,17 @@ mod tests {
                 assert!(text.iter().any(|t| t.contains("vmwp")), "{max}: {text:#?}");
             }
         }
+        // a busier adapter drawn lower keeps its rows; the idle one on top folds
+        let mut s2 = s.clone();
+        s2.gpus[0].util = 2.0;
+        s2.gpus[1].mem = 5e9;
+        s2.gpus[1].util = 90.0;
+        let l = render_fit(&s2, &args(), &local_headline(&s2), 100, 20);
+        let text: Vec<String> = l.iter().map(|l| l.render(false)).collect();
+        assert!(text.iter().position(|t| t.contains("Intel(R) Graphics")) < text.iter().position(|t| t.contains("NVIDIA GeForce")), "{text:#?}");
+        assert!(text.iter().any(|t| t.contains("app0")), "{text:#?}");
+        assert!(!text.iter().any(|t| t.contains("vmwp")), "{text:#?}");
+
         let mut all = args();
         all.all = true;
         assert!(render_fit(&s, &all, &h, 100, 9).len() > 9, "--all is never folded");
