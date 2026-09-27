@@ -85,6 +85,21 @@ fn share_words(share: f64) -> &'static str {
 pub struct Cand {
     pub kind: &'static str,
     pub text: String,
+    /// key phrases in text order, for the terminal to colour: (substring, SGR)
+    pub emph: Vec<(String, &'static str)>,
+}
+
+/// Bold version of a tag's chip colour (dim tags fall back to plain bold).
+fn emph_color(tag: &str) -> &'static str {
+    match crate::tags::color(tag) {
+        "2" => "1",
+        "35" => "1;35",
+        "33" => "1;33",
+        "32" => "1;32",
+        "36" => "1;36",
+        "37" => "1;37",
+        c => c,
+    }
 }
 
 /// Every template that applies right now. The first is the local pick.
@@ -96,7 +111,7 @@ pub fn candidates(s: &Snap) -> Vec<Cand> {
     let mut ranked: Vec<&Gpu> = s.gpus.iter().filter(|g| !g.procs.is_empty()).collect();
     ranked.sort_by(|a, b| b.util.total_cmp(&a.util));
     let Some(top) = ranked.first() else {
-        out.push(Cand { kind: "idle", text: "No GPU activity right now.".into() });
+        out.push(Cand { kind: "idle", text: "No GPU activity right now.".into(), emph: vec![] });
         return out;
     };
     let busy_now = top.util >= 15.0;
@@ -104,30 +119,35 @@ pub fn candidates(s: &Snap) -> Vec<Cand> {
 
     if let Some(b) = &b {
         let whom = b.top.map(|p| who(s, p));
-        let detail = match &whom {
-            Some(w) => format!(
-                "Your {} is {:.0}% busy — {} {} ({w}).",
-                b.g.short,
-                b.g.util,
-                share_words(b.share),
-                tag_phrase(b.tag)
-            ),
-            None => format!("Your {} is {:.0}% busy.", b.g.short, b.g.util),
+        let busy_words = format!("{:.0}% busy", b.g.util);
+        let tc = emph_color(b.tag);
+        let (detail, detail_emph) = match &whom {
+            Some(w) => {
+                let what = format!("{} ({w})", tag_phrase(b.tag));
+                (
+                    format!("Your {} is {busy_words} — {} {what}.", b.g.short, share_words(b.share)),
+                    vec![(busy_words.clone(), "1"), (what, tc)],
+                )
+            }
+            None => (format!("Your {} is {busy_words}.", b.g.short), vec![(busy_words.clone(), "1")]),
         };
-        let tagline = format!("{} is using the {} ({:.0}%).", cap(tag_phrase(b.tag)), b.g.short, b.g.util);
+        let pct_words = format!("({:.0}%)", b.g.util);
+        let tagline = format!("{} is using the {} {pct_words}.", cap(tag_phrase(b.tag)), b.g.short);
+        let tagline_emph = vec![(cap(tag_phrase(b.tag)), tc), (pct_words, "1")];
         let idle = {
             // the adapter most in use when nothing is really busy: prefer the iGPU's story
             let ig = s.gpus.iter().filter(|g| g.integrated && !g.npu).max_by(|a, b| a.util.total_cmp(&b.util)).copied_or(top);
             let ib = busy(ig, ig.util >= 1.0);
             let what = ib.as_ref().map(|x| tag_phrase(x.tag)).unwrap_or("nothing");
-            format!("GPUs are mostly idle; {what} is using the {}.", ig.short)
+            let c = ib.as_ref().map(|x| emph_color(x.tag)).unwrap_or("1");
+            (format!("GPUs are mostly idle; {what} is using the {}.", ig.short), vec![(what.to_string(), c)])
         };
         if busy_now {
-            out.push(Cand { kind: "detail", text: detail });
-            out.push(Cand { kind: "tag", text: tagline });
+            out.push(Cand { kind: "detail", text: detail, emph: detail_emph });
+            out.push(Cand { kind: "tag", text: tagline, emph: tagline_emph });
         } else {
-            out.push(Cand { kind: "idle", text: idle });
-            out.push(Cand { kind: "detail", text: detail });
+            out.push(Cand { kind: "idle", text: idle.0, emph: idle.1 });
+            out.push(Cand { kind: "detail", text: detail, emph: detail_emph });
         }
     }
 
@@ -136,17 +156,22 @@ pub fn candidates(s: &Snap) -> Vec<Cand> {
         let (a, c) = (ranked[0], ranked[1]);
         if let (Some(ba), Some(bc)) = (busy(a, a.util >= 1.0), busy(c, c.util >= 1.0)) {
             if c.util >= 1.0 || c.mem > 0.0 {
+                let (pa, pc) = (format!("({:.0}%)", a.util), format!("({:.0}%)", c.util));
                 out.push(Cand {
                     kind: "split",
                     text: format!(
-                        "The {} is busy with {} ({:.0}%) while the {} handles {} ({:.0}%).",
+                        "The {} is busy with {} {pa} while the {} handles {} {pc}.",
                         a.short,
                         tag_phrase(ba.tag),
-                        a.util,
                         c.short,
                         tag_phrase(bc.tag),
-                        c.util
                     ),
+                    emph: vec![
+                        (tag_phrase(ba.tag).to_string(), emph_color(ba.tag)),
+                        (pa, "1"),
+                        (tag_phrase(bc.tag).to_string(), emph_color(bc.tag)),
+                        (pc, "1"),
+                    ],
                 });
             }
         }
@@ -156,16 +181,12 @@ pub fn candidates(s: &Snap) -> Vec<Cand> {
     if let Some(d) = s.gpus.iter().filter(|g| !g.integrated && g.cap > 0.0).max_by(|a, b| a.mem.total_cmp(&b.mem)) {
         if let Some(bm) = busy(d, false) {
             if let Some(p) = bm.top {
+                let whom = cap(&who(s, p));
+                let busy_words = format!("{:.0}% busy", d.util);
                 out.push(Cand {
                     kind: "mem",
-                    text: format!(
-                        "{} holds {} of the {}'s {} VRAM, which is {:.0}% busy.",
-                        cap(&who(s, p)),
-                        gib(d.pmem(p)),
-                        d.short,
-                        gib(d.cap),
-                        d.util
-                    ),
+                    text: format!("{whom} holds {} of the {}'s {} VRAM, which is {busy_words}.", gib(d.pmem(p)), d.short, gib(d.cap)),
+                    emph: vec![(whom.clone(), emph_color(p.tag)), (busy_words, "1")],
                 });
             }
         }

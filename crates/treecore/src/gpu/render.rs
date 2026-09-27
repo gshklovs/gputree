@@ -320,12 +320,10 @@ pub fn render(s: &Snap, a: &Opts, head: &Headline, width: usize) -> Vec<Line> {
 
 /// The instant, local headline (first template), or a sampling note before util exists.
 pub fn local_headline(s: &Snap) -> Headline {
-    let text = headline::candidates(s)
-        .into_iter()
-        .next()
-        .map(|c| c.text)
-        .unwrap_or_else(|| "Sampling GPU load…".into());
-    Headline { text, source: "", jev_tags: 0 }
+    match headline::candidates(s).into_iter().next() {
+        Some(c) => Headline { text: c.text, source: "", jev_tags: 0, emph: c.emph },
+        None => Headline { text: "Sampling GPU load…".into(), source: "", jev_tags: 0, emph: vec![] },
+    }
 }
 
 #[cfg(test)]
@@ -369,6 +367,18 @@ mod tests {
 
     fn args() -> Opts {
         Opts { metric_util: false, depth: 3, top: 10, group: false, all: false }
+    }
+
+    #[test]
+    fn headline_lights_the_figure_and_the_workload() {
+        let s = fixture();
+        let h = local_headline(&s);
+        let l = h.line();
+        assert_eq!(l.render(false), h.text);
+        let seg = |needle: &str| l.segs.iter().find(|g| g.text.contains(needle)).map(|g| g.sgr.clone()).unwrap();
+        assert_eq!(seg("55% busy"), "1");
+        assert_eq!(seg("a training run (train bd1-walk-flat, WSL)"), crate::tags::color("training"));
+        assert_eq!(seg("Your"), "");
     }
 
     #[test]

@@ -60,6 +60,7 @@ impl Session {
         if let Some(k) = &self.jev_kind {
             if let Some(c) = headline::candidates(s).into_iter().find(|c| c.kind == k) {
                 h.text = c.text;
+                h.emph = c.emph;
                 h.source = "jev";
             }
         }

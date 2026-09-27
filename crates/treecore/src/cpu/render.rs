@@ -304,5 +304,5 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
 /// The instant, local headline (first template), or a note while CPU is being sampled.
 pub fn local_headline(s: &Snap) -> Headline {
     let text = headline::candidates(s).into_iter().next().map(|c| c.text).unwrap_or_else(|| "Sampling CPU load…".into());
-    Headline { text, source: "", jev_tags: 0 }
+    Headline { text, source: "", jev_tags: 0, emph: vec![] }
 }

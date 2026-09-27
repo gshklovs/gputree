@@ -221,12 +221,31 @@ pub struct Headline {
     /// "" for local, "jev" when Jev picked it
     pub source: &'static str,
     pub jev_tags: usize,
+    /// key phrases to colour, in the order they appear in `text`: (substring, SGR)
+    pub emph: Vec<(String, &'static str)>,
 }
 
 impl Headline {
     pub fn line(&self) -> Line {
         let mut h = Line::new();
-        h.push("1", self.text.clone());
+        if self.emph.is_empty() {
+            h.push("1", self.text.clone());
+        } else {
+            // plain sentence, key phrases lit: the figure in bold, the workload in its tag colour
+            let mut rest = self.text.as_str();
+            for (needle, sgr) in &self.emph {
+                if let Some(i) = rest.find(needle.as_str()).filter(|_| !needle.is_empty()) {
+                    if i > 0 {
+                        h.plain(rest[..i].to_string());
+                    }
+                    h.push(sgr, needle.clone());
+                    rest = &rest[i + needle.len()..];
+                }
+            }
+            if !rest.is_empty() {
+                h.plain(rest.to_string());
+            }
+        }
         if self.source == "jev" {
             h.push(
                 DIM,
