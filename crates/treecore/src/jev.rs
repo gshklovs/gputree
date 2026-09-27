@@ -11,6 +11,12 @@ use std::time::Duration;
 
 pub const ENDPOINT: &str = "https://api.typesafe.ai/v1/systemone";
 
+/// The endpoint, or a hidden override from `GPUTREE_JEV_URL` (for testing the offline
+/// fallback against an unreachable address without touching the network).
+pub fn endpoint() -> String {
+    std::env::var("GPUTREE_JEV_URL").ok().filter(|v| !v.trim().is_empty()).unwrap_or_else(|| ENDPOINT.to_string())
+}
+
 pub struct Question {
     pub key: String,
     pub instructions: String,
@@ -54,9 +60,11 @@ pub fn ask(key: &str, state: &str, questions: &[Question], timeout: Duration) ->
     }
     let body = json!({"state": state, "model": "jev-latest", "questions": qs}).to_string();
     let secs = timeout.as_secs_f64().max(0.5);
+    // An unreachable host should give up fast so the local headline shows.
+    let conn = secs.min(1.0);
     let config = format!(
-        "url = {}\nheader = {}\nheader = \"Content-Type: application/json\"\ndata-binary = {}\nmax-time = {secs:.1}\nsilent\n",
-        curl_quote(ENDPOINT),
+        "url = {}\nheader = {}\nheader = \"Content-Type: application/json\"\ndata-binary = {}\nconnect-timeout = {conn:.1}\nmax-time = {secs:.1}\nsilent\n",
+        curl_quote(&endpoint()),
         curl_quote(&format!("Authorization: Bearer {}", key.trim())),
         curl_quote(&body),
     );
