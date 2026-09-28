@@ -68,6 +68,8 @@ pub struct Snap {
     pub user: f64,
     pub kernel: f64,
     pub cores: Vec<f64>,
+    /// per core, the kernel-mode part of `cores` (percent of that core)
+    pub cores_kernel: Vec<f64>,
     pub mem_total: f64,
     pub mem_used: f64,
     pub ncpu: usize,
@@ -145,6 +147,7 @@ pub fn build(inp: &Inputs) -> Snap {
         user: 0.0,
         kernel: 0.0,
         cores: vec![],
+        cores_kernel: vec![],
         mem_total: mt as f64,
         mem_used: mt.saturating_sub(ma) as f64,
         ncpu,
@@ -179,6 +182,17 @@ pub fn build(inp: &Inputs) -> Snap {
                 let (di, dk, du) = (c.0 - p.0, c.1 - p.1, c.2 - p.2);
                 let all = (dk + du) as f64;
                 if all > 0.0 { ((all - di as f64) / all * 100.0).clamp(0.0, 100.0) } else { 0.0 }
+            })
+            .collect();
+        // kernel time includes idle; what is left over is time spent in kernel mode
+        snap.cores_kernel = cur
+            .cores
+            .iter()
+            .zip(prev.cores.iter())
+            .map(|(c, p)| {
+                let (di, dk, du) = (c.0 - p.0, c.1 - p.1, c.2 - p.2);
+                let all = (dk + du) as f64;
+                if all > 0.0 { ((dk - di) as f64 / all * 100.0).clamp(0.0, 100.0) } else { 0.0 }
             })
             .collect();
     }

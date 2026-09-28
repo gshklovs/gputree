@@ -149,16 +149,27 @@ impl<'a> Ctx<'a> {
     }
 }
 
-/// Per-core usage as one character each, wrapped over as many lines as needed.
+/// Cores whose busy time is at least this much kernel mode are drawn in `KERNEL_FG`.
+const KERNEL_SHARE: f64 = 0.5;
+const KERNEL_FG: &str = "38;5;141";
+
+/// Per-core usage as one character each, wrapped over as many lines as needed. The
+/// height is how busy the core is; a core that is mostly busy in kernel mode (drivers,
+/// interrupts, the VM's host side) turns violet instead of green / amber / red.
 fn core_lines(s: &Snap, width: usize, gutter: usize) -> Vec<Out> {
     const V: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    const LEGEND: usize = 16; // "  ▮ kernel-heavy"
     let per = width.saturating_sub(gutter + 2).max(8);
     let mut out = vec![];
+    let n_lines = s.cores.len().div_ceil(per).max(1);
     for (i, chunk) in s.cores.chunks(per).enumerate() {
         let mut l = Line::new();
-        for &c in chunk {
+        for (j, &c) in chunk.iter().enumerate() {
             let k = ((c / 100.0) * 8.0).ceil().clamp(1.0, 8.0) as usize - 1;
-            let fg = if c >= 66.0 {
+            let kern = s.cores_kernel.get(i * per + j).copied().unwrap_or(0.0);
+            let fg = if c >= 3.0 && kern >= c * KERNEL_SHARE {
+                KERNEL_FG
+            } else if c >= 66.0 {
                 "38;5;167"
             } else if c >= 33.0 {
                 "38;5;179"
@@ -167,6 +178,12 @@ fn core_lines(s: &Snap, width: usize, gutter: usize) -> Vec<Out> {
             };
             let sgr = if color_on() { format!("{fg};{}", crate::term::BAR_BG) } else { String::new() };
             l.push(&sgr, V[k].to_string());
+        }
+        // legend after the last row of sparks, when it fits
+        if color_on() && i + 1 == n_lines && gutter + l.width() + LEGEND <= width {
+            l.plain("  ");
+            l.push(KERNEL_FG, "▮");
+            l.push(DIM, " kernel-heavy");
         }
         out.push(Out::Label { label: if i == 0 { "cores" } else { "" }, bar: None, cells: vec![], rest: l });
     }
