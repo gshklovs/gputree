@@ -178,6 +178,66 @@ pub fn meter(frac: f64, w: usize) -> Line {
     l
 }
 
+/// A gauge split into coloured parts (fraction of the whole, 256-colour fill), left to
+/// right, on the dim track. Where two parts meet inside one cell, the eighth-block is
+/// drawn in the left part's colour over the right part's, so small parts stay visible.
+pub fn stacked(parts: &[(f64, u8)], w: usize) -> Line {
+    let total: f64 = parts.iter().map(|p| p.0.max(0.0)).sum();
+    if !color_on() || parts.is_empty() {
+        return bar(total, w);
+    }
+    const PART: [char; 8] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
+    let units = w * 8;
+    // [start, end) in eighths for each part; anything visible gets at least one eighth
+    let mut spans: Vec<(usize, usize, u8)> = vec![];
+    let mut at = 0usize;
+    let mut acc = 0.0;
+    for &(f, c) in parts {
+        if !(f > 0.0) {
+            continue;
+        }
+        acc += f;
+        let mut end = ((acc.min(1.0)) * units as f64).round() as usize;
+        if end <= at && f > 0.004 {
+            end = at + 1;
+        }
+        let end = end.min(units);
+        if end > at {
+            spans.push((at, end, c));
+            at = end;
+        }
+    }
+    let color_at = |u: usize| spans.iter().find(|s| s.0 <= u && u < s.1).map(|s| s.2);
+    let mut l = Line::new();
+    for cell in 0..w {
+        let (a, b) = (cell * 8, cell * 8 + 8);
+        let left = color_at(a);
+        // how far the left colour runs inside this cell
+        let run = (a..b).take_while(|&u| color_at(u) == left).count();
+        let (ch, fg, bg) = match left {
+            Some(c) if run == 8 && c == crate::tags::FILL_REST => ('▒', c, None),
+            Some(c) if run == 8 => ('█', c, None),
+            Some(c) => (PART[run], c, color_at(a + run)),
+            None => match color_at(a + run).filter(|_| run < 8) {
+                // track, then a part starting mid-cell: draw the part from the right
+                Some(c) => (PART[run], 236, Some(c)),
+                None => (' ', 236, None),
+            },
+        };
+        let bg = bg.map_or(BAR_BG.to_string(), |c| format!("48;5;{c}"));
+        l.push(&format!("38;5;{fg};{bg}"), ch.to_string());
+    }
+    // merge runs of the same style
+    let mut out = Line::new();
+    for s in l.segs {
+        match out.segs.last_mut() {
+            Some(p) if p.sgr == s.sgr => p.text.push_str(&s.text),
+            _ => out.segs.push(s),
+        }
+    }
+    out
+}
+
 /// "2.9 / 17.9 GiB": used and total in the total's unit.
 pub fn fmt_pair(used: f64, total: f64) -> String {
     const K: f64 = 1024.0;

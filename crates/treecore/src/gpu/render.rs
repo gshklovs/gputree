@@ -3,10 +3,10 @@
 
 use super::Opts;
 use super::headline;
-use super::model::{Gpu, Proc, Snap, by_tag, is_active, sort_procs};
+use super::model::{Gpu, Proc, Snap, TagGroup, by_tag, is_active, sort_procs};
 use crate::layout::{BAR, DIM, Headline, Out, Row, layout};
 use crate::tags;
-use crate::term::{Line, bar, fmt_bytes, fmt_pair};
+use crate::term::{Line, bar, color_on, fmt_bytes, fmt_pair};
 
 const MEM: usize = 9;
 const UTIL: usize = 5;
@@ -196,6 +196,7 @@ impl Ctx<'_> {
         self.out.push(Out::Free(head));
 
         let frac = if g.cap > 0.0 { g.mem / g.cap } else { 0.0 };
+        let groups = by_tag(g, a.metric_util);
         let mut rest = Line::new();
         if g.integrated {
             rest.push(DIM, "shared memory");
@@ -203,10 +204,18 @@ impl Ctx<'_> {
             rest.push(DIM, "compute accelerator");
         } else if frac >= 0.9 {
             rest.push("1;38;5;167", "near full · OOM risk");
+        } else if g.cap > 0.0 {
+            rest.push(DIM, format!("{} free", fmt_bytes(g.cap - g.mem)));
+        }
+        let untracked = g.mem - groups.iter().map(|t| t.mem).sum::<f64>();
+        if g.cap > 0.0 && untracked >= 64.0 * 1048576.0 && color_on() {
+            rest.push(&format!("38;5;{}", tags::FILL_REST), "  ▒");
+            rest.push(DIM, format!(" {} driver · untracked", fmt_bytes(untracked)));
         }
         self.out.push(Out::Meter {
             label: if g.integrated || g.npu { "mem" } else { "vram" },
             frac,
+            parts: if g.cap > 0.0 { mem_parts(g, &groups) } else { vec![] },
             value: mem_value(g),
             pct: if g.cap > 0.0 { pct(frac * 100.0) } else { String::new() },
             rest,
@@ -223,16 +232,19 @@ impl Ctx<'_> {
         self.out.push(Out::Meter {
             label: "util",
             frac: if self.s.util_ready { g.util / 100.0 } else { 0.0 },
+            parts: if self.s.util_ready { util_parts(g, &groups) } else { vec![] },
             value: String::new(),
             pct: if self.s.util_ready { pct(g.util) } else { "…".into() },
             rest,
         });
 
-        let groups = by_tag(g, a.metric_util);
         let mut tl = Line::new();
         for t in groups.iter().filter(|t| t.mem >= 1048576.0 || t.util >= 0.5).take(6) {
             if !tl.segs.is_empty() {
                 tl.plain("  ");
+            }
+            if color_on() {
+                tl.push(&format!("38;5;{}", tags::fill(t.tag)), "■ ");
             }
             tl.push(tags::color(t.tag), format!("[{}]", t.tag));
             let u = if self.s.util_ready { format!(" {}", pct(t.util)) } else { String::new() };
@@ -387,6 +399,29 @@ const IDLE_UTIL: f64 = 50.0;
 
 fn collapsed(s: &Snap, a: &Opts, g: &Gpu) -> bool {
     !a.all && secondary(g) && g.util < IDLE_UTIL && s.gpus.iter().any(|d| !secondary(d))
+}
+
+/// The memory gauge split by tag, largest first; what no process accounts for
+/// (driver, other sessions) is drawn after them in a neutral grey.
+fn mem_parts(g: &Gpu, groups: &[TagGroup]) -> Vec<(f64, u8)> {
+    let mut v: Vec<(f64, u8)> = groups.iter().map(|t| (t.mem / g.cap, tags::fill(t.tag))).collect();
+    v.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let known: f64 = groups.iter().map(|t| t.mem).sum();
+    v.push(((g.mem - known).max(0.0) / g.cap, tags::FILL_REST));
+    v
+}
+
+/// The util gauge split by tag. Per-process engine time and the adapter's figure (NVML's
+/// is busier: it counts any kernel running) differ, so each tag gets its share of the
+/// adapter's total.
+fn util_parts(g: &Gpu, groups: &[TagGroup]) -> Vec<(f64, u8)> {
+    let sum: f64 = groups.iter().map(|t| t.util).sum();
+    if sum <= 0.0 {
+        return vec![];
+    }
+    let mut v: Vec<(f64, u8)> = groups.iter().map(|t| (t.util / sum * g.util / 100.0, tags::fill(t.tag))).collect();
+    v.sort_by(|a, b| b.0.total_cmp(&a.0));
+    v
 }
 
 /// "2632 / 8151 MiB" for NVIDIA (nvidia-smi's own numbers), "2.9 / 17.9 GiB" otherwise.

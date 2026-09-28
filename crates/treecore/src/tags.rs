@@ -69,6 +69,30 @@ pub fn color(tag: &str) -> &'static str {
     }
 }
 
+/// 256-colour fill for a tag's share of a stacked gauge, the same hue as its chip.
+pub fn fill(tag: &str) -> u8 {
+    match tag {
+        "training" => 167,
+        "ai inference" => 170,
+        "compute" | "vm" => 133,
+        "video render" => 179,
+        "recording" | "video playback" => 143,
+        "game" => 71,
+        "game?" | "launcher" => 65,
+        "3d / cad" | "game dev" => 68,
+        "browser" => 73,
+        "app" | "terminal" => 250,
+        "desktop" => 110,
+        "audio" => 139,
+        "system" => 246,
+        _ => 103, // other
+    }
+}
+
+/// Fill for usage no process accounts for (driver, kernel, cache); drawn as a shade
+/// texture so it never reads as free space.
+pub const FILL_REST: u8 = 244;
+
 /// Map any string (e.g. a Jev answer) back onto a static tag.
 pub fn intern(s: &str) -> Option<&'static str> {
     ALL.iter().copied().find(|t| *t == s)

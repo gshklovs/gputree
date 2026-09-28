@@ -9,7 +9,7 @@
 //! returned is wider than the terminal.
 
 use crate::tags;
-use crate::term::{Line, bar, level_sgr, meter, pad_left, width_of};
+use crate::term::{Line, bar, level_sgr, meter, pad_left, stacked, width_of};
 
 pub const BAR: usize = 12;
 /// Widest a summary gauge gets, and the room kept after it for its detail text.
@@ -57,7 +57,8 @@ pub enum Out {
     Label { label: &'static str, bar: Option<f64>, cells: Vec<Cell>, rest: Line },
     /// a headline gauge: a wide bar, then `value` ("2632 / 8151 MiB"), a percentage
     /// and free text. Every gauge on a screen shares one bar width and number column.
-    Meter { label: &'static str, frac: f64, value: String, pct: String, rest: Line },
+    /// `parts` (fraction, 256-colour fill) splits the bar by who is using it.
+    Meter { label: &'static str, frac: f64, parts: Vec<(f64, u8)>, value: String, pct: String, rest: Line },
     Row(Row),
 }
 
@@ -128,10 +129,10 @@ pub fn layout(out: Vec<Out>, width: usize, cols: &[usize]) -> Vec<Line> {
                     }
                 }
             }
-            Out::Meter { label, frac, value, pct, rest } => {
+            Out::Meter { label, frac, parts, value, pct, rest } => {
                 l.push(DIM, format!(" {label}"));
                 l.pad_to(gutter);
-                l.append(meter(frac, meter_w));
+                l.append(if parts.is_empty() { meter(frac, meter_w) } else { stacked(&parts, meter_w) });
                 l.plain(" ");
                 l.push("1", pad_left(&value, value_w));
                 l.plain(" ");

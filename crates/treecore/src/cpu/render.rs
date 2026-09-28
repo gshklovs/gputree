@@ -212,6 +212,14 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     cx.out.push(Out::Free(t));
     cx.out.push(Out::Free(Line::new()));
 
+    let tagroll = by_tag(s, o.metric_mem);
+    let parts = |val: &dyn Fn(&(&'static str, f64, f64, Vec<usize>)) -> f64, whole: f64, used: f64| {
+        let mut v: Vec<(f64, u8)> = tagroll.iter().map(|t| (val(t) / whole, tags::fill(t.0))).collect();
+        v.sort_by(|a, b| b.0.total_cmp(&a.0));
+        let known: f64 = tagroll.iter().map(|t| val(t)).sum();
+        v.push(((used - known).max(0.0) / whole, tags::FILL_REST));
+        v
+    };
     let mut rest = Line::new();
     if s.cpu_ready {
         rest.push(DIM, format!("user {} · kernel {}", pct(s.user), pct(s.kernel)));
@@ -221,6 +229,7 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     cx.out.push(Out::Meter {
         label: "cpu",
         frac: if s.cpu_ready { s.total / 100.0 } else { 0.0 },
+        parts: if s.cpu_ready { parts(&|t| t.1, 100.0, s.total) } else { vec![] },
         value: String::new(),
         pct: if s.cpu_ready { pct(s.total) } else { "…".into() },
         rest,
@@ -231,14 +240,22 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     let frac = if s.mem_total > 0.0 { s.mem_used / s.mem_total } else { 0.0 };
     let mut rest = Line::new();
     if frac >= 0.9 {
-        rest.push("1;38;5;167", "near full");
+        rest.push("1;38;5;167", "near full  ");
     }
-    cx.out.push(Out::Meter { label: "mem", frac, value: fmt_pair(s.mem_used, s.mem_total), pct: pct(frac * 100.0), rest });
-    let tagroll = by_tag(s, o.metric_mem);
+    let untracked = s.mem_used - tagroll.iter().map(|t| t.2).sum::<f64>();
+    if untracked >= 1024.0 * 1048576.0 && color_on() {
+        rest.push(&format!("38;5;{}", tags::FILL_REST), "▒");
+        rest.push(DIM, format!(" {} kernel / cache", fmt_bytes(untracked)));
+    }
+    let mem_parts = if s.mem_total > 0.0 { parts(&|t| t.2, s.mem_total, s.mem_used) } else { vec![] };
+    cx.out.push(Out::Meter { label: "mem", frac, parts: mem_parts, value: fmt_pair(s.mem_used, s.mem_total), pct: pct(frac * 100.0), rest });
     let mut tl = Line::new();
     for (tag, c, m, _) in tagroll.iter().filter(|t| t.1 >= 0.5 || t.2 >= 256e6).take(6) {
         if !tl.segs.is_empty() {
             tl.plain("  ");
+        }
+        if color_on() {
+            tl.push(&format!("38;5;{}", tags::fill(tag)), "■ ");
         }
         tl.push(tags::color(tag), format!("[{tag}]"));
         let cc = if s.cpu_ready { format!(" {}", pct(*c)) } else { String::new() };
