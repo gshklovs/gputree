@@ -11,7 +11,11 @@ pub struct NvStats {
     pub util: f64,
     pub temp: Option<u32>,
     pub power_w: Option<f64>,
+    /// framebuffer (used, total) in bytes, as nvidia-smi reports it
+    pub mem: Option<(f64, f64)>,
 }
+
+const MIB: f64 = 1024.0 * 1024.0;
 
 static NVML: OnceLock<Option<Nvml>> = OnceLock::new();
 
@@ -27,6 +31,7 @@ fn via_nvml() -> Option<Vec<NvStats>> {
             util: d.utilization_rates().map(|u| u.gpu as f64).unwrap_or(0.0),
             temp: d.temperature(TemperatureSensor::Gpu).ok(),
             power_w: d.power_usage().ok().map(|mw| mw as f64 / 1000.0),
+            mem: d.memory_info().ok().map(|m| (m.used as f64, m.total as f64)),
         });
     }
     (!out.is_empty()).then_some(out)
@@ -35,7 +40,7 @@ fn via_nvml() -> Option<Vec<NvStats>> {
 fn via_smi() -> Option<Vec<NvStats>> {
     use std::os::windows::process::CommandExt;
     let out = std::process::Command::new("nvidia-smi")
-        .args(["--query-gpu=name,utilization.gpu,temperature.gpu,power.draw", "--format=csv,noheader,nounits"])
+        .args(["--query-gpu=name,utilization.gpu,temperature.gpu,power.draw,memory.used,memory.total", "--format=csv,noheader,nounits"])
         .creation_flags(crate::CREATE_NO_WINDOW)
         .output()
         .ok()?;
@@ -49,6 +54,10 @@ fn via_smi() -> Option<Vec<NvStats>> {
                 util: f[1].parse().unwrap_or(0.0),
                 temp: f[2].parse().ok(),
                 power_w: f[3].parse().ok(),
+                mem: match (f.get(4).and_then(|v| v.parse::<f64>().ok()), f.get(5).and_then(|v| v.parse::<f64>().ok())) {
+                    (Some(u), Some(t)) => Some((u * MIB, t * MIB)),
+                    _ => None,
+                },
             })
         })
         .collect();

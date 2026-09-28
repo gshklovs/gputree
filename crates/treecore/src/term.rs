@@ -150,16 +150,39 @@ pub fn bar(frac: f64, w: usize) -> Line {
         let used = full + usize::from(rem > 0);
         s.push_str(&(if color { " " } else { "·" }).repeat(w - used));
     }
-    let fg = if f >= 0.66 {
+    let mut l = Line::new();
+    l.push(&format!("{};{BAR_BG}", level_sgr(f, false)), s);
+    l
+}
+
+/// Green / amber / red by how full something is; `strong` also bolds it from 90%.
+pub fn level_sgr(frac: f64, strong: bool) -> String {
+    let fg = if frac >= 0.66 {
         "38;5;167"
-    } else if f >= 0.33 {
+    } else if frac >= 0.33 {
         "38;5;179"
     } else {
         "38;5;108"
     };
-    let mut l = Line::new();
-    l.push(&format!("{fg};{BAR_BG}"), s);
+    if strong && frac >= 0.9 { format!("1;{fg}") } else { fg.to_string() }
+}
+
+/// A summary gauge: `bar`, bold once it is 90% full.
+pub fn meter(frac: f64, w: usize) -> Line {
+    let mut l = bar(frac, w);
+    if frac >= 0.9 {
+        for s in &mut l.segs {
+            s.sgr = format!("1;{}", s.sgr);
+        }
+    }
     l
+}
+
+/// "2.9 / 17.9 GiB": used and total in the total's unit.
+pub fn fmt_pair(used: f64, total: f64) -> String {
+    const K: f64 = 1024.0;
+    let (d, u) = if total >= K * K * K { (K * K * K, "GiB") } else { (K * K, "MiB") };
+    if u == "GiB" { format!("{:.1} / {:.1} {u}", used / d, total / d) } else { format!("{:.0} / {:.0} {u}", used / d, total / d) }
 }
 
 pub fn fmt_bytes(b: f64) -> String {

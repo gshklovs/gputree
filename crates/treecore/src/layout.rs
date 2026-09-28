@@ -9,9 +9,12 @@
 //! returned is wider than the terminal.
 
 use crate::tags;
-use crate::term::{Line, bar, pad_left, width_of};
+use crate::term::{Line, bar, level_sgr, meter, pad_left, width_of};
 
 pub const BAR: usize = 12;
+/// Widest a summary gauge gets, and the room kept after it for its detail text.
+const METER_MAX: usize = 48;
+const METER_REST: usize = 22;
 pub const DIM: &str = "2";
 
 /// A styled cell: (text, SGR).
@@ -52,6 +55,9 @@ pub enum Out {
     /// summary rows: the label sits in the gutter, then bar, cells and free text.
     /// With no bar, `rest` starts at the bar column (e.g. a tag rollup).
     Label { label: &'static str, bar: Option<f64>, cells: Vec<Cell>, rest: Line },
+    /// a headline gauge: a wide bar, then `value` ("2632 / 8151 MiB"), a percentage
+    /// and free text. Every gauge on a screen shares one bar width and number column.
+    Meter { label: &'static str, frac: f64, value: String, pct: String, rest: Line },
     Row(Row),
 }
 
@@ -77,6 +83,10 @@ pub fn layout(out: Vec<Out>, width: usize, cols: &[usize]) -> Vec<Line> {
     let fixed = gutter + BAR + cells_w + 2;
     let tail = if tag_w > 0 { 1 + tag_w } else { 0 } + if pid_w > 0 { 2 + pid_w } else { 0 };
     let name_w = name_max.min(width.saturating_sub(fixed + tail)).max(10);
+
+    let meters = || out.iter().filter_map(|o| if let Out::Meter { value, .. } = o { Some(width_of(value)) } else { None });
+    let value_w = meters().max().unwrap_or(0);
+    let meter_w = width.saturating_sub(gutter + 1 + value_w + 1 + 4 + 2 + METER_REST).clamp(BAR, METER_MAX);
 
     let push_cells = |l: &mut Line, cells: &[Cell]| {
         for (i, w) in cols.iter().enumerate() {
@@ -117,6 +127,17 @@ pub fn layout(out: Vec<Out>, width: usize, cols: &[usize]) -> Vec<Line> {
                         l.append(rest);
                     }
                 }
+            }
+            Out::Meter { label, frac, value, pct, rest } => {
+                l.push(DIM, format!(" {label}"));
+                l.pad_to(gutter);
+                l.append(meter(frac, meter_w));
+                l.plain(" ");
+                l.push("1", pad_left(&value, value_w));
+                l.plain(" ");
+                l.push(&level_sgr(frac, true), pad_left(&pct, 4));
+                l.plain("  ");
+                l.append(rest);
             }
             Out::Row(r) => {
                 let pw = width_of(&r.prefix);

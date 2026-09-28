@@ -6,7 +6,7 @@ use super::headline;
 use super::model::{Group, LinuxProc, Snap, by_tag, groups};
 use crate::layout::{Cell, DIM, Headline, Out, Row, blank, cell, child_prefix, layout};
 use crate::tags;
-use crate::term::{Line, color_on, fmt_bytes};
+use crate::term::{Line, color_on, fmt_bytes, fmt_pair};
 
 const PCT: usize = 5;
 const MEM: usize = 9;
@@ -218,26 +218,22 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     } else {
         rest.push(DIM, "sampling…");
     }
-    cx.out.push(Out::Label {
+    cx.out.push(Out::Meter {
         label: "cpu",
-        bar: Some(if s.cpu_ready { s.total / 100.0 } else { 0.0 }),
-        cells: vec![cx.cpu_cell(s.total, ""), blank(), blank()],
+        frac: if s.cpu_ready { s.total / 100.0 } else { 0.0 },
+        value: String::new(),
+        pct: if s.cpu_ready { pct(s.total) } else { "…".into() },
         rest,
     });
     if s.cpu_ready && !s.cores.is_empty() {
         cx.out.extend(core_lines(s, width, 6));
     }
+    let frac = if s.mem_total > 0.0 { s.mem_used / s.mem_total } else { 0.0 };
     let mut rest = Line::new();
-    rest.push(
-        DIM,
-        format!("of {} ({:.0}%)", fmt_bytes(s.mem_total), if s.mem_total > 0.0 { s.mem_used / s.mem_total * 100.0 } else { 0.0 }),
-    );
-    cx.out.push(Out::Label {
-        label: "mem",
-        bar: Some(if s.mem_total > 0.0 { s.mem_used / s.mem_total } else { 0.0 }),
-        cells: vec![blank(), blank(), cell(fmt_bytes(s.mem_used), "")],
-        rest,
-    });
+    if frac >= 0.9 {
+        rest.push("1;38;5;167", "near full");
+    }
+    cx.out.push(Out::Meter { label: "mem", frac, value: fmt_pair(s.mem_used, s.mem_total), pct: pct(frac * 100.0), rest });
     let tagroll = by_tag(s, o.metric_mem);
     let mut tl = Line::new();
     for (tag, c, m, _) in tagroll.iter().filter(|t| t.1 >= 0.5 || t.2 >= 256e6).take(6) {

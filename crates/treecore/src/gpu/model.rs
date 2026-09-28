@@ -185,8 +185,13 @@ pub fn build(inp: &Inputs) -> Snap {
         let nv = a.and_then(|a| {
             inp.nv.as_ref()?.iter().find(|n| a.name.contains(n.name.trim_start_matches("NVIDIA ").trim())).cloned()
         });
+        let (mut mem, mut cap) = (mem, cap);
         if let Some(n) = &nv {
             util = util.max(n.util);
+            // the driver's own numbers, so the header matches nvidia-smi exactly
+            if let Some((u, t)) = n.mem.filter(|m| m.1 > 0.0) {
+                (mem, cap) = (u, t);
+            }
         }
         let g = Gpu { luid: l, short: short_name(&name, integrated, npu), name, integrated, npu, mem, cap, util, eng, procs: mine, nv };
         if !g.procs.is_empty() || g.mem > 0.0 {

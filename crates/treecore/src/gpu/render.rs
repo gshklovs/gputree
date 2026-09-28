@@ -4,9 +4,9 @@
 use super::Opts;
 use super::headline;
 use super::model::{Gpu, Proc, Snap, by_tag, is_active, sort_procs};
-use crate::layout::{DIM, Headline, Out, Row, layout};
+use crate::layout::{BAR, DIM, Headline, Out, Row, layout};
 use crate::tags;
-use crate::term::{Line, fmt_bytes};
+use crate::term::{Line, bar, fmt_bytes, fmt_pair};
 
 const MEM: usize = 9;
 const UTIL: usize = 5;
@@ -160,6 +160,22 @@ impl Ctx<'_> {
         });
     }
 
+    /// An idle iGPU / NPU next to a discrete GPU, in one line.
+    fn adapter_line(&mut self, g: &Gpu) {
+        let mut l = Line::new();
+        l.push("36", g.name.clone());
+        l.plain("  ");
+        l.append(bar(if g.cap > 0.0 { g.mem / g.cap } else { 0.0 }, BAR));
+        let mut bits = vec![format!("{}{}", mem_value(g), if g.integrated && !g.npu { " shared" } else { "" })];
+        if self.s.util_ready {
+            bits.push(format!("util {}", pct(g.util)));
+        }
+        let n = g.procs.len();
+        bits.push(format!("{n} process{} (--all)", if n == 1 { "" } else { "es" }));
+        l.push(DIM, format!("  {}", bits.join(" · ")));
+        self.out.push(Out::Free(l));
+    }
+
     fn adapter(&mut self, g: &Gpu, top: usize) {
         let a = self.a;
         self.out.push(Out::Free(Line::new()));
@@ -179,16 +195,20 @@ impl Ctx<'_> {
         }
         self.out.push(Out::Free(head));
 
+        let frac = if g.cap > 0.0 { g.mem / g.cap } else { 0.0 };
         let mut rest = Line::new();
-        if g.cap > 0.0 {
-            rest.push(DIM, format!("of {}{}", fmt_bytes(g.cap), if g.integrated { " shared" } else { "" }));
+        if g.integrated {
+            rest.push(DIM, "shared memory");
         } else if g.npu {
             rest.push(DIM, "compute accelerator");
+        } else if frac >= 0.9 {
+            rest.push("1;38;5;167", "near full · OOM risk");
         }
-        self.out.push(Out::Label {
-            label: "mem",
-            bar: Some(if g.cap > 0.0 { g.mem / g.cap } else { 0.0 }),
-            cells: vec![(fmt_bytes(g.mem), ""), (String::new(), "")],
+        self.out.push(Out::Meter {
+            label: if g.integrated || g.npu { "mem" } else { "vram" },
+            frac,
+            value: mem_value(g),
+            pct: if g.cap > 0.0 { pct(frac * 100.0) } else { String::new() },
             rest,
         });
         let mut rest = Line::new();
@@ -200,10 +220,11 @@ impl Ctx<'_> {
         } else {
             rest.push(DIM, "sampling…");
         }
-        self.out.push(Out::Label {
+        self.out.push(Out::Meter {
             label: "util",
-            bar: Some(if self.s.util_ready { g.util / 100.0 } else { 0.0 }),
-            cells: vec![(String::new(), ""), self.util_cell(g.util)],
+            frac: if self.s.util_ready { g.util / 100.0 } else { 0.0 },
+            value: String::new(),
+            pct: if self.s.util_ready { pct(g.util) } else { "…".into() },
             rest,
         });
 
@@ -346,11 +367,39 @@ pub fn render_fit(s: &Snap, a: &Opts, head: &Headline, width: usize, max_lines: 
     l
 }
 
-/// Adapters in drawing order: by memory (or util with --metric util), largest first.
+/// Adapters in drawing order: discrete GPUs first (they're what people come to look
+/// at), then by memory (or util with --metric util), largest first.
 fn draw_order<'a>(s: &'a Snap, a: &Opts) -> Vec<&'a Gpu> {
     let mut gpus: Vec<&Gpu> = s.gpus.iter().collect();
-    gpus.sort_by(|x, y| if a.metric_util { y.util.total_cmp(&x.util) } else { y.mem.total_cmp(&x.mem) });
+    gpus.sort_by(|x, y| {
+        let by = if a.metric_util { y.util.total_cmp(&x.util) } else { y.mem.total_cmp(&x.mem) };
+        secondary(x).cmp(&secondary(y)).then(by)
+    });
     gpus
+}
+
+fn secondary(g: &Gpu) -> bool {
+    g.integrated || g.npu
+}
+
+/// Below this an iGPU / NPU is drawn as one line when there is a discrete GPU.
+const IDLE_UTIL: f64 = 50.0;
+
+fn collapsed(s: &Snap, a: &Opts, g: &Gpu) -> bool {
+    !a.all && secondary(g) && g.util < IDLE_UTIL && s.gpus.iter().any(|d| !secondary(d))
+}
+
+/// "2632 / 8151 MiB" for NVIDIA (nvidia-smi's own numbers), "2.9 / 17.9 GiB" otherwise.
+fn mem_value(g: &Gpu) -> String {
+    const MIB: f64 = 1024.0 * 1024.0;
+    if g.cap <= 0.0 {
+        fmt_bytes(g.mem)
+    } else if g.nv.is_some() || g.name.starts_with("NVIDIA") {
+        // MiB from the first frame, so the column doesn't change unit once NVML answers
+        format!("{} / {} MiB", (g.mem / MIB) as u64, (g.cap / MIB) as u64)
+    } else {
+        fmt_pair(g.mem, g.cap)
+    }
 }
 
 fn render_with(s: &Snap, a: &Opts, head: &Headline, width: usize, budget: &Budget) -> Vec<Line> {
@@ -372,8 +421,18 @@ fn render_with(s: &Snap, a: &Opts, head: &Headline, width: usize, budget: &Budge
     );
     cx.out.push(Out::Free(t));
 
-    for (i, g) in draw_order(s, a).into_iter().enumerate() {
-        cx.adapter(g, budget.tops.get(i).copied().unwrap_or(a.top));
+    let order = draw_order(s, a);
+    let mut first_line = true;
+    for (i, g) in order.into_iter().enumerate() {
+        if collapsed(s, a, g) {
+            if first_line {
+                cx.out.push(Out::Free(Line::new()));
+                first_line = false;
+            }
+            cx.adapter_line(g);
+        } else {
+            cx.adapter(g, budget.tops.get(i).copied().unwrap_or(a.top));
+        }
     }
     if budget.notes && s.wsl.as_ref().is_some_and(|w| !w.is_empty()) {
         cx.out.push(Out::Free(Line::new()));
@@ -486,7 +545,8 @@ mod tests {
         s2.gpus[1].util = 90.0;
         let l = render_fit(&s2, &args(), &local_headline(&s2), 100, 20);
         let text: Vec<String> = l.iter().map(|l| l.render(false)).collect();
-        assert!(text.iter().position(|t| t.contains("Intel(R) Graphics")) < text.iter().position(|t| t.contains("NVIDIA GeForce")), "{text:#?}");
+        // the discrete GPU is drawn first even when the iGPU holds more memory
+        assert!(text.iter().position(|t| t.contains("NVIDIA GeForce")) < text.iter().position(|t| t.contains("Intel(R) Graphics")), "{text:#?}");
         assert!(text.iter().any(|t| t.contains("app0")), "{text:#?}");
         assert!(!text.iter().any(|t| t.contains("vmwp")), "{text:#?}");
 
