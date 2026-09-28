@@ -226,14 +226,6 @@ impl Session {
     }
 }
 
-unsafe extern "system" fn on_ctrl(_: u32) -> windows_sys::core::BOOL {
-    use std::io::Write;
-    let mut o = std::io::stdout();
-    let _ = o.write_all(b"\x1b[0m\x1b[?25h\n");
-    let _ = o.flush();
-    0 // let the default handler end the process
-}
-
 fn main() {
     let a = match args::parse() {
         Ok(a) => a,
@@ -274,9 +266,7 @@ fn main() {
     if a.watch > 0.0 {
         let mut painter = Some(Painter::new(color, true));
         if tty {
-            unsafe {
-                windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(on_ctrl), 1);
-            }
+            term::restore_on_interrupt();
             print!("\x1b[?25l\x1b[H\x1b[2J");
         } else {
             painter = None;

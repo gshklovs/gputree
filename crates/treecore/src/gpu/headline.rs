@@ -1,7 +1,7 @@
 //! One plain-English sentence at the top. Built locally from templates; Jev (optional)
 //! only picks which template reads best and re-tags unknown processes.
 
-use super::model::{Gpu, Proc, Snap, by_tag};
+use super::model::{Gpu, Proc, Snap, by_tag, is_vm_host};
 
 pub fn tag_phrase(tag: &str) -> &'static str {
     match tag {
@@ -20,7 +20,7 @@ pub fn tag_phrase(tag: &str) -> &'static str {
         "app" => "desktop apps",
         "terminal" => "the terminal",
         "desktop" => "the desktop",
-        "system" => "Windows",
+        "system" => crate::SYSTEM_PHRASE,
         "vm" => "a virtual machine",
         "audio" => "audio",
         _ => "other apps",
@@ -61,7 +61,7 @@ fn busy<'a>(g: &'a Gpu, by_util: bool) -> Option<Busy<'a>> {
 
 /// "train bd1-walk-flat, WSL" for the VM, else the process name.
 fn who(s: &Snap, p: &Proc) -> String {
-    if p.name.eq_ignore_ascii_case("vmwp") {
+    if is_vm_host(&p.name) {
         if let Some(w) = s.wsl.as_ref().and_then(|w| {
             w.iter().filter(|w| w.tag == p.tag).max_by(|a, b| a.rss.total_cmp(&b.rss)).or_else(|| w.iter().max_by(|a, b| a.rss.total_cmp(&b.rss)))
         }) {

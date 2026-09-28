@@ -8,4 +8,7 @@ license.workspace = true
 [dependencies]
 treecore = { path = "../treecore" }
 treeview = { path = "../treeview" }
+
+# Windows only: on other systems the binary is a stub and GPUI is never built
+[target.'cfg(windows)'.dependencies]
 gpui-kit = { version = "=0.6.6", default-features = false, features = ["assets"] }

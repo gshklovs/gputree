@@ -43,8 +43,10 @@ pub fn describe(tag: &str) -> &'static str {
         "browser" => "a web browser",
         "app" => "a regular desktop application (chat, editor, office, music, notes...)",
         "terminal" => "a terminal emulator or console host",
-        "desktop" => "the Windows shell, compositor or a desktop utility",
-        "system" => "a Windows system component, driver or background service",
+        "desktop" if cfg!(windows) => "the Windows shell, compositor or a desktop utility",
+        "desktop" => "the display server, compositor, desktop shell or a desktop utility",
+        "system" if cfg!(windows) => "a Windows system component, driver or background service",
+        "system" => "an operating-system component, kernel thread, daemon or background service",
         "vm" => "a virtual machine",
         "audio" => "audio processing",
         _ => "none of the above, or it cannot be determined",
@@ -89,6 +91,8 @@ struct Rules {
     gamedev: Regex,
     gamename: Regex,
     gamepath: Regex,
+    gamepath_unix: Regex,
+    game_unix: Regex,
     launcher: Regex,
     playback: Regex,
     browser: Regex,
@@ -96,6 +100,7 @@ struct Rules {
     vm: Regex,
     desktop: Regex,
     app: Regex,
+    audio: Regex,
     winpath: Regex,
 }
 
@@ -111,18 +116,24 @@ static R: LazyLock<Rules> = LazyLock::new(|| Rules {
     // games that do not install under a store's folder
     gamename: re(r"^(robloxplayerbeta|robloxplayerlauncher|minecraft\.windows|league of legends|valorant-win64-shipping|fortniteclient-win64-shipping)$"),
     gamepath: re(r"steamapps\\common|\\epic games\\|\\xboxgames\\|\\riot games\\|battle\.net|\\ea games\\|\\ubisoft\\|\\gog games\\|\\games\\"),
-    launcher: re(r"^(steam|steamwebhelper|epicgameslauncher|battle\.net|riotclientservices|eadesktop|galaxyclient|xboxpcapp)$"),
-    playback: re(r"^(vlc|mpv|mpc-hc\d*|video\.ui|microsoft\.media\.player|netflix|potplayer)"),
-    browser: re(r"^(chrome|msedge|firefox|brave|opera|arc|vivaldi|zen)$"),
-    terminal: re(r"^(windowsterminal|conhost|wezterm.*|alacritty|openconsole)$"),
-    vm: re(r"^(vmwp|vmmem.*)$"),
-    desktop: re(r"^(dwm|explorer|csrss|system|shellhost|startmenuexperiencehost|searchhost|textinputhost|applicationframehost|widgetboard|widgets|lockapp|shellexperiencehost|crossdeviceresume|powertoys.*|microsoft\.cmdpal\.ui|phoneexperiencehost|systemsettings)$"),
-    app: re(r"^(discord|slack|teams|ms-teams|zoom|claude|code|cursor|spotify|m365copilot|mscopilot|whatsapp|notion|obsidian|msedgewebview2|onedrive|outlook|olk)$"),
+    // Linux: Steam / Heroic / Lutris libraries (checked against the path and command line)
+    gamepath_unix: re(r"/steamapps/common/|/heroic/|/lutris/|/games/"),
+    // Linux: Proton / Wine and the Steam runtime around a running game
+    game_unix: re(r"^(proton|wine|wine64|wine-preloader|wine64-preloader|wineserver|gamescope|pressure-vessel-.*|steam-runtime-launcher-service)$"),
+    launcher: re(r"^(steam|steamwebhelper|epicgameslauncher|battle\.net|riotclientservices|eadesktop|galaxyclient|xboxpcapp|lutris|heroic|bottles)$"),
+    playback: re(r"^(vlc|mpv|mpc-hc\d*|video\.ui|microsoft\.media\.player|netflix|potplayer|totem|celluloid|smplayer|haruna)"),
+    browser: re(r"^(chrome|msedge|firefox|brave|opera|arc|vivaldi|zen|chromium|chromium-browser|firefox-bin|firefox-esr|librewolf|brave-browser)$"),
+    terminal: re(r"^(windowsterminal|conhost|wezterm.*|alacritty|openconsole|gnome-terminal-server|konsole|kitty|foot|xterm|tilix|terminator|ghostty|xfce4-terminal|ptyxis)$"),
+    vm: re(r"^(vmwp|vmmem.*|qemu-system-.*|qemu-kvm|virtualboxvm|vboxheadless|firecracker|crosvm|vmware-vmx)$"),
+    desktop: re(r"^(dwm|explorer|csrss|system|shellhost|startmenuexperiencehost|searchhost|textinputhost|applicationframehost|widgetboard|widgets|lockapp|shellexperiencehost|crossdeviceresume|powertoys.*|microsoft\.cmdpal\.ui|phoneexperiencehost|systemsettings|xorg|xwayland|gnome-shell|kwin_wayland|kwin_x11|plasmashell|mutter|sway|hyprland|weston|xfwm4|cinnamon|gnome-session-binary|xdg-desktop-portal.*|weston-rdp|msrdc)$"),
+    app: re(r"^(discord|slack|teams|ms-teams|zoom|claude|code|cursor|spotify|m365copilot|mscopilot|whatsapp|notion|obsidian|msedgewebview2|onedrive|outlook|olk|thunderbird|signal-desktop|telegram-desktop)$"),
+    audio: re(r"^(audiodg|pipewire|pipewire-pulse|pulseaudio|wireplumber|jackd)$"),
     winpath: re(r"\\windows\\|\\windowsapps\\"),
 });
 
 /// `name` is the process name without `.exe`, `path` the image path (may be empty),
-/// `cmd` a command line (WSL only), `eng` per-engine-type utilisation if known.
+/// `cmd` a command line (WSL rows and Linux processes), `eng` per-engine-type
+/// utilisation if known.
 pub fn tag(name: &str, path: &str, cmd: &str, eng: Option<&BTreeMap<String, f64>>) -> &'static str {
     let r = &*R;
     let n = name.to_lowercase();
@@ -134,6 +145,19 @@ pub fn tag(name: &str, path: &str, cmd: &str, eng: Option<&BTreeMap<String, f64>
     }
     if r.ai.is_match(&format!("{n} {c}")) {
         return "ai inference";
+    }
+    // Linux games: a Steam / Heroic / Lutris library path, Proton (a Python script) and
+    // Wine, and Steam's `reaper`, which wraps every game it launches (`reaper
+    // SteamLaunch AppId=...`; on Windows REAPER is also a DAW, so it needs Steam context).
+    // Windows image paths use backslashes, so none of this matches them.
+    let steam = |s: &str| s.contains("steam");
+    if r.gamepath_unix.is_match(&p)
+        || r.gamepath_unix.is_match(&c)
+        || r.gamepath.is_match(&c) // a Wine game's command line is a Windows path
+        || r.game_unix.is_match(&n)
+        || (n == "reaper" && (steam(&p) || steam(&c)))
+    {
+        return "game";
     }
     if py || r.compute.is_match(&n) {
         return "compute";
@@ -171,7 +195,7 @@ pub fn tag(name: &str, path: &str, cmd: &str, eng: Option<&BTreeMap<String, f64>
     if r.vm.is_match(&n) {
         return "vm";
     }
-    if n == "audiodg" {
+    if r.audio.is_match(&n) {
         return "audio";
     }
     if matches!(n.as_str(), "system" | "idle" | "registry") {
@@ -204,6 +228,87 @@ pub fn tag(name: &str, path: &str, cmd: &str, eng: Option<&BTreeMap<String, f64>
 #[cfg(test)]
 mod tests {
     use super::tag;
+    use std::collections::BTreeMap;
+
+    fn t(name: &str, path: &str, cmd: &str) -> &'static str {
+        tag(name, path, cmd, None)
+    }
+
+    #[test]
+    fn linux_games() {
+        let steam = "/home/u/.local/share/Steam";
+        assert_eq!(t("reaper", &format!("{steam}/ubuntu12_32/reaper"), "reaper SteamLaunch AppId=1245620 -- /home/u/x"), "game");
+        assert_eq!(
+            t("eldenring.exe", "/home/u/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)/files/bin/wine64-preloader", ""),
+            "game"
+        );
+        assert_eq!(t("Game.x86_64", "", &format!("{steam}/steamapps/common/Hades II/Game.x86_64")), "game");
+        assert_eq!(t("Hades.exe", "", r"Z:\home\u\.local\share\Steam\steamapps\common\Hades\x64\Hades.exe"), "game");
+        assert_eq!(t("proton", "", "python3 /home/u/.steam/steam/steamapps/common/Proton/proton waitforexitandrun"), "game");
+        assert_eq!(t("wine64-preloader", "/usr/bin/wine64-preloader", "C:\\Games\\x.exe"), "game");
+        assert_eq!(t("wineserver", "", ""), "game");
+        assert_eq!(t("steam", &format!("{steam}/ubuntu12_32/steam"), "steam -silent"), "launcher");
+        assert_eq!(t("steamwebhelper", "", ""), "launcher");
+        // REAPER the DAW (Windows) is not a Steam game
+        assert_eq!(t("reaper", r"c:\program files\reaper (x64)\reaper.exe", ""), "other");
+    }
+
+    #[test]
+    fn linux_media_and_ai() {
+        assert_eq!(t("ffmpeg", "/usr/bin/ffmpeg", "ffmpeg -i in.mkv -c:v hevc_vaapi out.mkv"), "video render");
+        assert_eq!(t("obs", "/usr/bin/obs", "obs --startreplaybuffer"), "recording");
+        assert_eq!(t("ollama", "/usr/local/bin/ollama", "/usr/local/bin/ollama serve"), "ai inference");
+        assert_eq!(t("llama-server", "/opt/llama.cpp/build/bin/llama-server", "llama-server -m q.gguf"), "ai inference");
+        assert_eq!(t("mpv", "/usr/bin/mpv", "mpv movie.mkv"), "video playback");
+    }
+
+    #[test]
+    fn linux_python() {
+        assert_eq!(t("python3", "/usr/bin/python3.12", "/usr/bin/python3 train.py --epochs 3"), "training");
+        assert_eq!(
+            t("train bd1-walk-flat", "", "/home/u/p/.venv/bin/python /home/u/p/.venv/bin/train bd1-walk-flat --x 1"),
+            "training"
+        );
+        assert_eq!(t("python3", "", "/usr/bin/python3 -m http.server"), "compute");
+        assert_eq!(t("python3", "", "python3 finetune_lora.py"), "training");
+    }
+
+    #[test]
+    fn linux_desktop_and_friends() {
+        assert_eq!(t("Xorg", "/usr/lib/xorg/Xorg", "/usr/lib/xorg/Xorg :0"), "desktop");
+        assert_eq!(t("Xwayland", "", "/usr/bin/Xwayland :0"), "desktop");
+        assert_eq!(t("gnome-shell", "", ""), "desktop");
+        assert_eq!(t("kwin_wayland", "", ""), "desktop");
+        assert_eq!(t("gnome-terminal-server", "", ""), "terminal");
+        assert_eq!(t("kitty", "", ""), "terminal");
+        assert_eq!(t("chromium", "", ""), "browser");
+        assert_eq!(t("firefox-bin", "", ""), "browser");
+        assert_eq!(t("pipewire", "", ""), "audio");
+        assert_eq!(t("qemu-system-x86_64", "", ""), "vm");
+        assert_eq!(t("code", "/usr/share/code/code", ""), "app");
+    }
+
+    #[test]
+    fn linux_engine_hints() {
+        let mut e = BTreeMap::new();
+        e.insert("videoencode".to_string(), 30.0);
+        assert_eq!(tag("gst-launch-1.0", "/usr/bin/gst-launch-1.0", "", Some(&e)), "video render");
+        let mut e = BTreeMap::new();
+        e.insert("3d".to_string(), 80.0);
+        assert_eq!(tag("mygame", "/home/u/mygame/mygame", "", Some(&e)), "game?");
+    }
+
+    #[test]
+    fn windows_rules_unchanged() {
+        assert_eq!(t("vmwp", "", ""), "vm");
+        assert_eq!(t("chrome", r"c:\program files\google\chrome\application\chrome.exe", ""), "browser");
+        assert_eq!(t("eldenring", r"d:\steamlibrary\steamapps\common\elden ring\game\eldenring.exe", ""), "game");
+        assert_eq!(t("audiodg", "", ""), "audio");
+        assert_eq!(t("dwm", r"c:\windows\system32\dwm.exe", ""), "desktop");
+        let mut e = BTreeMap::new();
+        e.insert("3d".to_string(), 80.0);
+        assert_eq!(tag("notepad", r"c:\windows\system32\notepad.exe", "", Some(&e)), "other");
+    }
 
     #[test]
     fn games_outside_store_folders() {

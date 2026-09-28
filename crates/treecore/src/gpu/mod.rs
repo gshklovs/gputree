@@ -2,6 +2,7 @@
 //! the Linux processes holding /dev/dxg inside WSL.
 
 pub mod collect;
+pub mod drm;
 pub mod headline;
 pub mod model;
 pub mod nvidia;

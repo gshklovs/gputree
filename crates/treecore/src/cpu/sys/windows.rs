@@ -1,27 +1,14 @@
-//! One read-only NtQuerySystemInformation call gives every process with its parent,
-//! start time, CPU time and memory; GetSystemTimes / per-core times give the totals.
+//! The Windows backend. One read-only NtQuerySystemInformation call gives every process
+//! with its parent, start time, CPU time and memory; GetSystemTimes / per-core times
+//! give the totals.
 
+use super::PInfo;
 use windows_sys::Wdk::System::SystemInformation::{
     NtQuerySystemInformation, SystemProcessInformation, SystemProcessorPerformanceInformation,
 };
 use windows_sys::Win32::Foundation::FILETIME;
 use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 use windows_sys::Win32::System::Threading::{ALL_PROCESSOR_GROUPS, GetActiveProcessorCount, GetSystemTimes};
-
-#[derive(Clone, Debug)]
-pub struct PInfo {
-    pub pid: u32,
-    pub ppid: u32,
-    /// image name without ".exe"
-    pub name: String,
-    /// FILETIME-style 100 ns ticks since 1601
-    pub create: i64,
-    /// user + kernel, 100 ns ticks
-    pub cpu: i64,
-    /// private working set, bytes (Task Manager's "Memory")
-    pub mem: u64,
-    pub threads: u32,
-}
 
 fn rd<T: Copy>(b: &[u8], off: usize) -> T {
     assert!(off + std::mem::size_of::<T>() <= b.len());
@@ -84,6 +71,7 @@ pub fn processes() -> Vec<PInfo> {
             cpu: user + kernel,
             mem: ws_private.max(0) as u64,
             threads,
+            cmd: String::new(),
         });
         if next == 0 {
             break;
@@ -125,6 +113,12 @@ pub fn core_times() -> Vec<(i64, i64, i64)> {
 
 pub fn ncpu() -> usize {
     unsafe { GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) }.max(1) as usize
+}
+
+/// Windows only exposes CPU temperature through WMI/ACPI, which is neither cheap nor
+/// reliable, so it is not shown.
+pub fn cpu_temp() -> Option<f64> {
+    None
 }
 
 /// (total, available) physical memory, bytes.

@@ -1,12 +1,22 @@
 //! TypeSafe's Jev API: typed multiple-choice answers about a text state.
-//! Called through Windows' built-in curl.exe (schannel TLS, no C toolchain needed).
-//! The key is passed on curl's stdin config, never on a command line.
+//! Called through curl (Windows' built-in curl.exe with schannel TLS, the system curl
+//! on Linux), so no TLS stack is compiled in. The key is passed on curl's stdin
+//! config, never on a command line.
 
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::io::Write;
-use std::os::windows::process::CommandExt;
 use std::process::{Command, Stdio};
+
+#[cfg(windows)]
+fn curl_path() -> String {
+    std::env::var("SystemRoot").map(|r| format!(r"{r}\System32\curl.exe")).unwrap_or("curl.exe".into())
+}
+
+#[cfg(not(windows))]
+fn curl_path() -> String {
+    "curl".into()
+}
 use std::time::Duration;
 
 pub const ENDPOINT: &str = "https://api.typesafe.ai/v1/systemone";
@@ -68,15 +78,11 @@ pub fn ask(key: &str, state: &str, questions: &[Question], timeout: Duration) ->
         curl_quote(&format!("Authorization: Bearer {}", key.trim())),
         curl_quote(&body),
     );
-    let curl = std::env::var("SystemRoot").map(|r| format!(r"{r}\System32\curl.exe")).unwrap_or("curl.exe".into());
-    let mut child = Command::new(curl)
-        .args(["-K", "-", "-w", "\n%{http_code}"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .creation_flags(crate::CREATE_NO_WINDOW)
-        .spawn()
-        .map_err(|e| format!("curl: {e}"))?;
+    let mut child = crate::no_window(
+        Command::new(curl_path()).args(["-K", "-", "-w", "\n%{http_code}"]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()),
+    )
+    .spawn()
+    .map_err(|e| format!("curl: {e}"))?;
     child.stdin.take().ok_or("curl stdin")?.write_all(config.as_bytes()).map_err(|e| format!("curl stdin: {e}"))?;
     let out = child.wait_with_output().map_err(|e| format!("curl: {e}"))?;
     let text = String::from_utf8_lossy(&out.stdout);

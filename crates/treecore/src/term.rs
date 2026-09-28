@@ -226,6 +226,7 @@ pub fn stdout_is_tty() -> bool {
 }
 
 /// Turn on ANSI processing for classic conhost (Windows Terminal already has it).
+#[cfg(windows)]
 pub fn enable_vt() {
     use windows_sys::Win32::System::Console::*;
     unsafe {
@@ -235,6 +236,30 @@ pub fn enable_vt() {
             SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT);
         }
     }
+}
+
+/// Unix terminals speak ANSI already.
+#[cfg(not(windows))]
+pub fn enable_vt() {}
+
+/// In --watch the cursor is hidden; put it (and the colours) back when Ctrl+C ends
+/// the process, then let it end.
+#[cfg(windows)]
+pub fn restore_on_interrupt() {
+    unsafe extern "system" fn on_ctrl(_: u32) -> windows_sys::core::BOOL {
+        let mut o = std::io::stdout();
+        let _ = o.write_all(b"\x1b[0m\x1b[?25h\n");
+        let _ = o.flush();
+        0 // let the default handler end the process
+    }
+    unsafe {
+        windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(on_ctrl), 1);
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn restore_on_interrupt() {
+    crate::linux::on_interrupt_restore_terminal();
 }
 
 /// Redraws a block of lines in place: moves up over what was drawn last time, rewrites

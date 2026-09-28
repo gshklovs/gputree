@@ -7,6 +7,10 @@
 //! placement, the top bar / trail / side panel / key bar structure, and the
 //! keyboard model. Each adapted file says so at its top. disktree's mark,
 //! review and removal flow is not here: these windows are read-only.
+//!
+//! Windows only (GPUI needs the MSVC toolchain); elsewhere the crate is empty.
+
+#![cfg(windows)]
 
 pub mod app;
 pub mod appearance;

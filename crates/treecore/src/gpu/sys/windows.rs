@@ -1,9 +1,10 @@
-//! Thin, read-only Win32 helpers: GPU performance counters, the DirectX / ComputeAccelerator
-//! registry keys, and the process list. Nothing here ever opens a process for
-//! anything beyond PROCESS_QUERY_LIMITED_INFORMATION (image path lookup).
+//! The Windows backend. Thin, read-only Win32 helpers: GPU performance counters, the
+//! DirectX / ComputeAccelerator registry keys, and the process list. Nothing here ever
+//! opens a process for anything beyond PROCESS_QUERY_LIMITED_INFORMATION (image path lookup).
 
+use super::{Adapter, Raw};
 use regex::Regex;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::ptr::{null, null_mut};
 use std::sync::LazyLock;
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, SYSTEMTIME};
@@ -28,23 +29,6 @@ fn from_wide_buf(b: &[u16]) -> String {
 }
 
 // ---------------------------------------------------------------- GPU counters
-
-/// Per (luid, pid) numbers from the GPU counters.
-#[derive(Clone, Debug, Default)]
-pub struct ProcRaw {
-    pub ded: f64,
-    pub shr: f64,
-    /// engine type (lowercase, "_N" stripped) -> summed utilisation %
-    pub eng: BTreeMap<String, f64>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Raw {
-    pub procs: HashMap<(u64, u32), ProcRaw>,
-    /// luid -> (dedicated, shared) bytes in use
-    pub adapter_mem: HashMap<u64, (f64, f64)>,
-    pub util_ready: bool,
-}
 
 /// The same data as the PDH counters `\GPU Engine(*)\Utilization Percentage`,
 /// `\GPU Process Memory(*)\{Dedicated,Shared} Usage` and `\GPU Adapter Memory(*)\...`,
@@ -350,13 +334,6 @@ impl Drop for Counters {
 
 // ---------------------------------------------------------------- registry
 
-#[derive(Clone, Debug)]
-pub struct Adapter {
-    pub name: String,
-    pub total: f64,
-    pub shared: f64,
-}
-
 fn reg_bytes(root: HKEY, sub: &str, value: &str) -> Option<Vec<u8>> {
     unsafe {
         let (s, v) = (wide(sub), wide(value));
@@ -491,6 +468,12 @@ pub fn process_path(pid: u32) -> Option<String> {
         CloseHandle(h);
         ok.then(|| String::from_utf16_lossy(&buf[..len as usize]))
     }
+}
+
+/// Command lines of other processes are not read on Windows (it would need
+/// PROCESS_VM_READ); the tags use the name and image path.
+pub fn process_cmd(_pid: u32) -> Option<String> {
+    None
 }
 
 pub fn local_time() -> String {

@@ -1208,7 +1208,6 @@ version = "0.1.0"
 dependencies = [
  "crossterm",
  "treecore",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2806,7 +2805,6 @@ version = "0.1.0"
 dependencies = [
  "crossterm",
  "treecore",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6848,6 +6846,7 @@ name = "treecore"
 version = "0.1.0"
 dependencies = [
  "crossterm",
+ "libc",
  "nvml-wrapper",
  "regex",
  "serde_json",

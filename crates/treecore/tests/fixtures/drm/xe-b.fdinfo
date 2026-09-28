@@ -1,0 +1,19 @@
+pos:	0
+flags:	02100002
+mnt_id:	27
+ino:	1200
+drm-driver:	xe
+drm-client-id:	9
+drm-pdev:	0000:03:00.0
+drm-total-system:	0
+drm-total-gtt:	10 MiB
+drm-shared-gtt:	0
+drm-total-vram0:	512 MiB
+drm-resident-vram0:	500 MiB
+drm-cycles-rcs:	350000
+drm-total-cycles-rcs:	2000000
+drm-cycles-bcs:	0
+drm-total-cycles-bcs:	2000000
+drm-cycles-ccs:	400000
+drm-total-cycles-ccs:	2000000
+drm-engine-capacity-ccs:	4
