@@ -71,6 +71,7 @@ impl Ctx<'_> {
             alts: vec![],
             tag: (!a.group).then_some((p.tag, p.jev_tag)),
             pid: format!("pid {}", p.pid),
+            split: vec![],
         });
 
         // children: engines, WSL processes, spill note
@@ -91,6 +92,7 @@ impl Ctx<'_> {
                     alts: vec![],
                     tag: None,
                     pid: String::new(),
+                    split: vec![],
                 });
             }
         }
@@ -120,6 +122,7 @@ impl Ctx<'_> {
                         },
                         tag: Some((w.tag, false)),
                         pid: format!("pid {}", w.pid),
+                        split: vec![],
                     });
                 }
             }
@@ -136,6 +139,7 @@ impl Ctx<'_> {
                 alts: vec![],
                 tag: None,
                 pid: String::new(),
+                split: vec![],
             });
         }
         let n = kids.len();
@@ -157,6 +161,7 @@ impl Ctx<'_> {
             alts: vec![],
             tag: None,
             pid: String::new(),
+            split: vec![],
         });
     }
 
@@ -272,6 +277,7 @@ impl Ctx<'_> {
                     alts: vec![],
                     tag: None,
                     pid: format!("{np} process{}", if np == 1 { "" } else { "es" }),
+                    split: vec![],
                 });
                 if a.depth < 2 {
                     continue;

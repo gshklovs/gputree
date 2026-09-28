@@ -6,7 +6,7 @@ use super::headline;
 use super::model::{Group, LinuxProc, Snap, by_tag, groups};
 use crate::layout::{Cell, DIM, Headline, Out, Row, blank, cell, child_prefix, layout};
 use crate::tags;
-use crate::term::{Line, color_on, fmt_bytes, fmt_pair};
+use crate::term::{Line, color_on, fmt_bytes, fmt_pair, level_fill, shade};
 
 const PCT: usize = 5;
 const MEM: usize = 9;
@@ -42,6 +42,19 @@ impl<'a> Ctx<'a> {
         } else {
             0.0
         }
+    }
+
+    /// A parent's bar in two tones of its level colour: its own share solid, its
+    /// descendants' share darker after it. Empty (a plain bar) when it has no busy
+    /// descendants.
+    fn own_split(&self, g: &Group) -> Vec<(f64, u8)> {
+        let whole = self.frac(g.sub_cpu, g.sub_mem);
+        let own = self.frac(g.own_cpu, g.own_mem).min(whole);
+        if whole - own < 0.002 || !color_on() {
+            return vec![];
+        }
+        let c = level_fill(whole);
+        vec![(own, c), (whole - own, shade(c))]
     }
 
     /// Children of one level: Linux processes first under the VM, then Windows groups,
@@ -114,6 +127,7 @@ impl<'a> Ctx<'a> {
                 let mut r = Row::new(prefix, name);
                 r.last = last;
                 r.bar = Some(self.frac(g.sub_cpu, g.sub_mem));
+                r.split = self.own_split(&g);
                 r.cells = vec![self.cpu_cell(g.sub_cpu, ""), self.cpu_cell(g.own_cpu, DIM), cell(fmt_bytes(g.sub_mem), "")];
                 r.tag = (!self.o.group).then_some((g.tag, g.jev_tag));
                 r.pid = if many { format!("{} procs", g.members.len()) } else { format!("pid {}", self.s.procs[g.members[0]].pid) };
@@ -267,6 +281,13 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
     cx.out.push(Out::Free(Line::new()));
     let mut hdr = Line::new();
     hdr.push(DIM, if o.group { "tag / process" } else { "process tree" });
+    if color_on() && !o.group {
+        hdr.push(DIM, "   bar ");
+        hdr.push("38;5;108", "■");
+        hdr.push(DIM, " own ");
+        hdr.push("38;5;65", "■");
+        hdr.push(DIM, " children");
+    }
     cx.out.push(Out::Label { label: "", bar: None, cells: vec![cell("Σcpu", DIM), cell("own", DIM), cell("Σmem", DIM)], rest: hdr });
 
     if o.group {

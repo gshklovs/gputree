@@ -238,6 +238,40 @@ pub fn stacked(parts: &[(f64, u8)], w: usize) -> Line {
     out
 }
 
+/// The fill colour `bar` uses at this level (green / amber / red).
+pub fn level_fill(frac: f64) -> u8 {
+    if frac >= 0.66 {
+        167
+    } else if frac >= 0.33 {
+        179
+    } else {
+        108
+    }
+}
+
+/// A darker shade of the same hue: a secondary part next to its primary (children
+/// next to a process's own share, a second process of the same tag).
+pub fn shade(c: u8) -> u8 {
+    match c {
+        167 => 131,
+        179 => 136,
+        108 => 65,
+        170 => 133,
+        133 => 96,
+        143 => 101,
+        71 => 28,
+        65 => 22,
+        68 => 25,
+        73 => 30,
+        250 => 245,
+        110 => 67,
+        139 => 96,
+        246 => 241,
+        103 => 60,
+        c => c,
+    }
+}
+
 /// "2.9 / 17.9 GiB": used and total in the total's unit.
 pub fn fmt_pair(used: f64, total: f64) -> String {
     const K: f64 = 1024.0;

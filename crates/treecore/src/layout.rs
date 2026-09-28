@@ -40,11 +40,14 @@ pub struct Row {
     pub alts: Vec<Line>,
     pub tag: Option<(&'static str, bool)>,
     pub pid: String,
+    /// when set, the bar is drawn split into these parts (fraction, 256-colour fill)
+    /// instead of one `bar` fill
+    pub split: Vec<(f64, u8)>,
 }
 
 impl Row {
     pub fn new(prefix: &str, name: Line) -> Row {
-        Row { prefix: prefix.to_string(), last: false, bar: None, cells: vec![], name, alts: vec![], tag: None, pid: String::new() }
+        Row { prefix: prefix.to_string(), last: false, bar: None, cells: vec![], name, alts: vec![], tag: None, pid: String::new(), split: vec![] }
     }
 }
 
@@ -145,6 +148,9 @@ pub fn layout(out: Vec<Out>, width: usize, cols: &[usize]) -> Vec<Line> {
                 let fill = gutter.saturating_sub(pw + 2);
                 l.push(DIM, format!("{}{}{} ", r.prefix, if r.last { "└" } else { "├" }, "─".repeat(fill)));
                 match r.bar {
+                    Some(_) if !r.split.is_empty() => {
+                        l.append(stacked(&r.split, BAR));
+                    }
                     Some(f) => {
                         l.append(bar(f, BAR));
                     }
