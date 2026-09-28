@@ -1,1 +1,18 @@
 /target/
+
+# launch video pipeline: scripts, web page and captures are tracked; renders,
+# models, music stems and intermediate frames stay local
+/launch/out/
+/launch/frames/
+/launch/gifframes/
+/launch/music/
+/launch/llama/
+/launch/gui/
+/launch/*.wav
+/launch/*.gguf
+/launch/*.zip
+/launch/*.log
+/launch/*.err
+/launch/*.out
+__pycache__/
+/launch/.venv/

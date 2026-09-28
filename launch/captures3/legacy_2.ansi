@@ -1,0 +1,58 @@
+[1mgputree[0m[2m  3 adapter(s) - ranked by vram - 17:02:53[0m
+
+[1m[36mNVIDIA GeForce RTX 5060 Laptop GPU[0m
+  mem  [33m███████████[2m░░░░░░░░░░░░░[0m 3.6 GiB / 7.7 GiB
+  util [31m████████████████████████[2m[0m 98%  76C  75W[2m  3d 97%  copy 54%  videoencode 17%[0m
+  tags [1;31m[training][0m 2.6 GiB 54%  [1;35m[ai inference][0m 458 MiB 3%  [1;33m[video render][0m 297 MiB 17%  [2m[other][0m 220 MiB 0%  [1;32m[game][0m 138 MiB 52%  [0m…
+├─ [31m████████[2m░░░░[0m   2.6 GiB   54% vmwp [35m(WSL2 VM)[0m [1;31m[training][0m[2m  pid 21712[0m
+│  ├─ [33m████[2m░░░░[0m 3d           53.7%
+│  ├─ [32m[2m░░░░░░░░[0m copy          0.6%
+│  ├─ [35mUbuntu-22.04[0m [1;31m[training][0m [1m/home/grego/ll/microduck_rl/.venv/bin/python /home/grego/ll/microduck_rl/.venv/bin/train bd1-walk-fl[0m…
+│  └─ [2m+ 80 MiB spilled to shared system memory[0m
+├─ [32m█[2m░░░░░░░░░░░[0m   458 MiB    3% llama-server [1;35m[ai inference][0m[2m  pid 5656[0m
+│  ├─ [32m[2m░░░░░░░░[0m 3d            2.6%
+│  ├─ [32m[2m░░░░░░░░[0m copy          0.1%
+│  └─ [2m+ 14 MiB spilled to shared system memory[0m
+├─ [32m█[2m░░░░░░░░░░░[0m   297 MiB   17% ffmpeg [1;33m[video render][0m[2m  pid 7892[0m
+│  ├─ [32m█[2m░░░░░░░[0m videoencode  16.8%
+│  ├─ [32m[2m░░░░░░░░[0m 3d            2.0%
+│  ├─ [32m[2m░░░░░░░░[0m copy          0.8%
+│  └─ [2m+ 449 MiB spilled to shared system memory[0m
+├─ [32m█[2m░░░░░░░░░░░[0m   220 MiB    0% Studio [2m[other][0m[2m  pid 33080[0m
+│  ├─ [32m[2m░░░░░░░░[0m 3d            0.3%
+│  ├─ [32m[2m░░░░░░░░[0m copy          0.1%
+│  └─ [2m+ 14 MiB spilled to shared system memory[0m
+├─ [32m[2m░░░░░░░░░░░░[0m   138 MiB   52% SlayTheSpire2 [1;32m[game][0m[2m  pid 36480[0m
+│  ├─ [33m████[2m░░░░[0m copy         52.4%
+│  ├─ [33m███[2m░░░░░[0m 3d           38.5%
+│  └─ [2m+ 110 MiB spilled to shared system memory[0m
+├─ [32m[2m░░░░░░░░░░░░[0m     4 MiB    0% System [2m[system][0m[2m  pid 4[0m
+└─ [2m+ 6 more process(es), 780 KiB combined (-All to list)[0m
+
+[1m[36mIntel(R) Graphics[0m
+  mem  [32m████[2m░░░░░░░░░░░░░░░░░░░░[0m 2.8 GiB / 17.9 GiB shared
+  util [32m██[2m░░░░░░░░░░░░░░░░░░░░░░[0m 9%[2m  3d 9%[0m
+  tags [2m[desktop][0m 10.6 GiB 1%  [36m[browser][0m 767 MiB 0%  [37m[app][0m 514 MiB 0%  [37m[terminal][0m 487 MiB 7%  [2m[other][0m 134 MiB 1%  [32m[launcher[0m…
+├─ [31m████████████[2m[0m   9.8 GiB    1% dwm [2m[desktop][0m[2m  pid 2592[0m
+│  └─ [32m[2m░░░░░░░░[0m 3d            1.1%
+├─ [32m███[2m░░░░░░░░░[0m   742 MiB    0% chrome [36m[browser][0m[2m  pid 23104[0m
+├─ [32m██[2m░░░░░░░░░░[0m   487 MiB    7% WindowsTerminal [37m[terminal][0m[2m  pid 20628[0m
+│  └─ [32m█[2m░░░░░░░[0m 3d            6.7%
+├─ [32m█[2m░░░░░░░░░░░[0m   322 MiB    0% explorer [2m[desktop][0m[2m  pid 9884[0m
+│  └─ [32m[2m░░░░░░░░[0m 3d            0.1%
+├─ [32m█[2m░░░░░░░░░░░[0m   222 MiB    0% msedgewebview2 [37m[app][0m[2m  pid 29408[0m
+├─ [32m█[2m░░░░░░░░░░░[0m   157 MiB    0% Slack [37m[app][0m[2m  pid 27952[0m
+├─ [32m█[2m░░░░░░░░░░░[0m   122 MiB    0% msedgewebview2 [37m[app][0m[2m  pid 18128[0m
+├─ [32m[2m░░░░░░░░░░░░[0m   100 MiB    0% SnippingTool [2m[other][0m[2m  pid 14708[0m
+├─ [32m[2m░░░░░░░░░░░░[0m    81 MiB    0% Microsoft.CmdPal.UI [2m[desktop][0m[2m  pid 16932[0m
+├─ [32m[2m░░░░░░░░░░░░[0m    71 MiB    0% PowerToys [2m[desktop][0m[2m  pid 18732[0m
+└─ [2m+ 29 more process(es), 526 MiB combined (-All to list)[0m
+
+[1m[36mIntel(R) AI Boost (compute, luid 0x147a3)[0m
+  mem  [32m[2m░░░░░░░░░░░░░░░░░░░░░░░░[0m 50 MiB
+  util [32m[2m░░░░░░░░░░░░░░░░░░░░░░░░[0m 0%[2m  [0m
+  tags [2m[audio][0m 50 MiB 0%
+├─ [31m████████████[2m[0m    50 MiB    0% audiodg [2m[audio][0m[2m  pid 9204[0m
+└─ [2m+ 2 more process(es), 8 KiB combined (-All to list)[0m
+
+[2mWSL2 shares one VM, so per-Linux-process GPU % is not visible from Windows; the VM total above is theirs combined.[0m

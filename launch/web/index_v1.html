@@ -1,0 +1,288 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>gputree launch</title>
+<style>
+@font-face{font-family:"CM";src:url("CascadiaMono.ttf");font-weight:200 700}
+:root{--bg:#07090b;--term:#0C0C0C;--fg:#CCCCCC;--train:#E74856;--game:#16C60C;--render:#F5C84C;--ai:#D65AD0;--cad:#3B78FF;--jev:#61D6D6}
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:radial-gradient(1200px 700px at 50% 40%,#10151b,#050607);font-family:"CM",monospace;color:#eee}
+#cam{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+.win{position:absolute;background:var(--term);border-radius:10px;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px #2a2d31;overflow:hidden}
+.tabbar{position:absolute;left:0;top:0;right:0;height:42px;background:#1b1d20;display:flex;align-items:flex-end;padding-left:10px}
+.tab{height:34px;padding:0 18px;background:var(--term);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px;font:15px "Segoe UI",sans-serif;color:#ddd}
+.tab i{width:14px;height:14px;border-radius:3px;background:#2d64b8;display:inline-block}
+.ctrls{position:absolute;right:0;top:0;height:42px;display:flex}
+.ctrls span{width:54px;height:42px;display:flex;align-items:center;justify-content:center;color:#aaa;font:14px "Segoe UI",sans-serif}
+.term{position:absolute;white-space:pre;font-size:27.3067px;line-height:30px;color:var(--fg);font-family:"CM",monospace;font-variant-ligatures:none}
+.term div{height:30px}
+.cur{background:#CCCCCC;color:#0C0C0C}
+.b{font-weight:700}.d{opacity:.55}
+#ov{position:absolute;inset:0;pointer-events:none}
+.cap{position:absolute;padding:18px 30px 18px 26px;background:rgba(10,12,15,.97);border-left:8px solid #fff;border-radius:6px;font-size:44px;line-height:54px;color:#f3f3f3;box-shadow:0 12px 40px rgba(0,0,0,.5);white-space:nowrap}
+.cap small{display:block;font-size:26px;line-height:34px;color:#9aa3ad;margin-top:4px}
+.hl{position:absolute;border-radius:6px}
+.callout{position:absolute;font-size:36px;line-height:44px;padding:12px 22px;background:rgba(10,12,15,.92);border:2px solid var(--train);color:#fff;border-radius:6px;white-space:nowrap}
+svg.lines{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:visible}
+.bar{text-shadow:.6px 0 currentColor,-.6px 0 currentColor}
+.toast{position:absolute;width:560px;padding:22px 26px;background:#2b2b2b;border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.6);font-family:"Segoe UI",sans-serif;color:#fff;border:1px solid #3a3a3a}
+.toast .t{font-size:30px;font-weight:600}.toast .s{font-size:22px;color:#bbb;margin-top:6px}
+.toast .app{font-size:18px;color:#aaa;margin-bottom:10px;display:flex;gap:10px;align-items:center}
+.fine{position:absolute;font-size:20px;color:#9aa3ad;background:rgba(8,9,11,.92);padding:6px 12px;border-radius:5px}
+.pane{position:absolute;top:60px;height:960px;width:900px;background:var(--term);border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 1px #2a2d31}
+.pane .hdr{position:absolute;left:0;right:0;top:0;height:120px;background:#15181b;padding:16px 24px;box-sizing:border-box}
+.pane .hdr .n{font-size:26px;color:#aab}
+.pane .hdr .v{font-size:52px;line-height:64px;font-weight:700}
+.pane .term{font-size:14.5px;line-height:17px}
+.pane .term div{height:17px}
+#end{position:absolute;inset:0;background:#060708;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
+#end .t1{font-size:120px;font-weight:700;letter-spacing:-2px}
+#end .t2{font-size:46px;color:#dfe3e7}
+#end .t3{font-size:38px;color:#9fe8e8}
+#end .t4{font-size:26px;color:#7d858d;margin-top:16px}
+.chips{display:flex;gap:22px;font-size:34px;font-weight:700}
+</style></head>
+<body>
+<div id="stage">
+  <div id="cam"><div class="win" id="win"><div class="tabbar"><div class="tab"><i></i>Windows PowerShell</div></div>
+    <div class="ctrls"><span>&#8212;</span><span>&#9633;</span><span>&#10005;</span></div>
+    <div class="term" id="term"></div></div></div>
+  <div id="race" style="position:absolute;inset:0;display:none"></div>
+  <div id="ov"></div>
+  <div id="end" style="display:none"></div>
+</div>
+<script src="screens.js"></script>
+<script src="beats.js"></script>
+<script>
+const MODE = location.hash.includes("gif") ? "gif" : "video";
+const B = window.BEATS, S = window.SCREENS;
+const WX = 40, WY = 24, WW = 1840, WH = 1032, TAB = 42, PADL = 22, PADT = 12, RH = 30;
+const win = document.getElementById("win"), term = document.getElementById("term"), cam = document.getElementById("cam");
+const ov = document.getElementById("ov"), race = document.getElementById("race"), end = document.getElementById("end");
+Object.assign(win.style, {left: WX + "px", top: WY + "px", width: WW + "px", height: WH + "px"});
+Object.assign(term.style, {left: PADL + "px", top: TAB + PADT + "px"});
+let CW = 16.4;
+function measure() { const c = document.createElement("canvas").getContext("2d"); c.font = '27.3067px "CM"'; CW = c.measureText("0".repeat(100)).width / 100; }
+
+// ---------- numbers taken from the captures (never typed by hand) ----------
+const ms = (cap, key) => parseFloat((S[cap].stderr.find(l => l.s.includes(key)) || {s: "NaN"}).s);
+const N = {
+  first: Math.round(ms("cold", "phase1 drawn")),             // 27
+  read: Math.round(ms("cold", "counters open")),             // 9
+  legacy: S.legacy.first_byte_ms / 1000,                      // 21.4
+  offline: ms("offline", "final drawn") / 1000,               // 1.35
+  smiUtil: (S.smi.snaps.at(-1).rows.map(r => r.map(x => x[0]).join("")).join("\n").match(/(\d+)%\s+Default/) || [])[1],
+};
+
+// ---------- helpers ----------
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const lerp = (a, b, x) => a + (b - a) * x;
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+function rowsHTML(rows) {
+  return rows.map(r => "<div>" + r.map(([t, fg, bg, fl]) => {
+    let st = `color:${fg}`; if (bg) st += `;background:${bg}`;
+    const cls = (fl & 1 ? "b " : "") + (fl & 2 ? "d " : "") + (/[▀-▟]/.test(t) ? "bar" : "");
+    return `<span class="${cls}" style="${st}">${esc(t)}</span>`;
+  }).join("") + "</div>").join("");
+}
+function snapAt(cap, msSince) { const sn = S[cap].snaps; let s = null; for (const x of sn) { if (x.t <= msSince) s = x; else break; } return s; }
+const P = S.cold.prompt;
+function promptRow(typed, cursorOn) { return [[P + typed, "#CCCCCC", null, 0]].concat(cursorOn ? [[" ", "#0C0C0C", "#CCCCCC", 0]] : []); }
+// a terminal "shot": type cmd between t0..t1, press enter at te; capture plays at real time (x stretch)
+function shot(t, cap, t0, t1, te, stretch = 1) {
+  const cmd = S[cap].cmd;
+  if (t < te) {
+    const n = Math.round(clamp((t - t0) / (t1 - t0)) * cmd.length);
+    const blink = t < t0 || t > t1 ? (Math.floor(t * 2.2) % 2 === 0) : true;
+    return {key: cap + "p" + n + blink, rows: [promptRow(cmd.slice(0, n), blink)]};
+  }
+  const s = snapAt(cap, (t - te) * 1000 / stretch);
+  return {key: cap + s.t, rows: s.rows};
+}
+function blankPrompt(t) { const on = Math.floor(t * 2.2) % 2 === 0; return {key: "bp" + on, rows: [promptRow("", on)]}; }
+// window-local row/col -> cam space
+const qx = c => WX + PADL + c * CW, qy = r => WY + TAB + PADT + r * RH;
+let CAM = {s: 1, qx: 960, qy: 540, px: 960, py: 540};
+const toStage = (x, y) => [CAM.px + CAM.s * (x - CAM.qx), CAM.py + CAM.s * (y - CAM.qy)];
+function camKey(k) { return k; }
+function camBetween(t, keys) { // keys: [t, v, dur]: at t start easing to v over dur
+  let cur = keys[0][1];
+  for (let i = 1; i < keys.length; i++) {
+    const [kt, v, dur] = keys[i];
+    if (t < kt) break;
+    const x = ease((t - kt) / (dur || .45)), o = {};
+    for (const k of ["s", "qx", "qy", "px", "py"]) o[k] = lerp(cur[k], v[k], x);
+    cur = o;
+  }
+  return cur;
+}
+const FULL = {s: 1, qx: 960, qy: 540, px: 960, py: 540};
+const fit = (r0, r1, c0, c1, s, px = 960, py = 540) => ({s, qx: (qx(c0) + qx(c1)) / 2, qy: (qy(r0) + qy(r1 + 1)) / 2, px, py});
+
+// ---------- overlay primitives (stage space, rebuilt every frame) ----------
+let H = "";
+function cap(text, sub, color, x, y, a, anchor = "left") {
+  if (a <= 0) return;
+  const tr = anchor === "center" ? "translateX(-50%)" : anchor === "right" ? "translateX(-100%)" : "";
+  H += `<div class="cap" style="left:${x}px;top:${y}px;border-color:${color};opacity:${a};transform:${tr} translateY(${(1 - a) * 18}px)">${text}${sub ? `<small>${sub}</small>` : ""}</div>`;
+}
+function hlRows(r0, r1, c0, c1, color, a, fill = .14) {
+  if (a <= 0) return;
+  const [x0, y0] = toStage(qx(c0) - 6, qy(r0) - 1), [x1, y1] = toStage(qx(c1) + 6, qy(r1 + 1) + 1);
+  H += `<div class="hl" style="left:${x0}px;top:${y0}px;width:${x1 - x0}px;height:${y1 - y0}px;opacity:${a};background:${color}${Math.round(fill * 255).toString(16).padStart(2, "0")};box-shadow:inset 0 0 0 3px ${color}"></div>`;
+}
+function spot(r0, r1, c0, c1, a) { // dim everything but a rectangle of cells
+  if (a <= 0) return;
+  const [x0, y0] = toStage(qx(c0) - 8, qy(r0) - 3), [x1, y1] = toStage(qx(c1) + 8, qy(r1 + 1) + 3);
+  H += `<div class="hl" style="left:${x0}px;top:${y0}px;width:${x1 - x0}px;height:${y1 - y0}px;box-shadow:0 0 0 4000px rgba(0,0,0,${.6 * a})"></div>`;
+}
+function fadeIO(t, a, b, fi = .18, fo = .18) { return Math.min(clamp((t - a) / fi), clamp((b - t) / fo)); }
+function wifi(x, y, slash, a) {
+  if (a <= 0) return;
+  const L = 150;
+  H += `<svg class="lines" style="opacity:${a}"><g transform="translate(${x},${y})" fill="none" stroke-linecap="round">
+   <path d="M-44 -6 A62 62 0 0 1 44 -6" stroke="#eee" stroke-width="9"/><path d="M-28 12 A38 38 0 0 1 28 12" stroke="#eee" stroke-width="9"/>
+   <circle cx="0" cy="30" r="7" fill="#eee" stroke="none"/>
+   <line x1="-50" y1="-40" x2="50" y2="44" stroke="#0C0C0C" stroke-width="20" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - slash)}"/>
+   <line x1="-50" y1="-40" x2="50" y2="44" stroke="#E74856" stroke-width="9" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - slash)}"/></g></svg>`;
+}
+
+// ---------- the timeline ----------
+const b = k => B[Math.floor(k)] + (k % 1) * (B[Math.floor(k) + 1] - B[Math.floor(k)]);
+const GIF_EXTRA = MODE === "gif" ? 6 : 0;          // watch lasts 6 more beats in the README loop
+const T = {
+  smiEnter: b(1) - S.smi.first_byte_ms / 1000,
+  drop: b(4), coldStart: b(6), coldEnter: b(7) - N.first / 1000,
+  jev: b(12), watch: b(16), watchEnter: b(17) - 0.052 * 1.115, off: b(22 + GIF_EXTRA),
+  offEnter: b(26) - N.offline, race: b(29), raceEnter: b(29) + 0.36, cpu: b(35), cpuEnter: b(35) + .55, end: b(39), total: 24.0,
+};
+T.gifStart = b(6); T.gifEnd = b(22 + GIF_EXTRA);
+
+function render(t) {
+  H = ""; let shotState, camv = FULL, filter = "", showWin = true;
+  race.style.display = "none"; end.style.display = "none";
+  // 1-2: nvidia-smi hook + glitch
+  if (t < T.coldStart) {
+    shotState = shot(t, "smi", .08, T.smiEnter - .06, T.smiEnter);
+    const tableV = fit(0, 20, 0, 90, 1.22, 960, 470);
+    const zoomV = fit(19, 19, 2, 29, 2.5, 960, 470);
+    camv = camBetween(t, [[0, fit(0, 20, 0, 90, 1.12, 960, 470)], [T.smiEnter, tableV, .6], [T.drop, zoomV, .22]]);
+    CAM = camv;
+    if (t >= T.drop) { // glitch burst on the kick
+      const g = clamp(1 - (t - T.drop) / .32), j = Math.sin(t * 997) * 14 * g;
+      filter = g > 0 ? `drop-shadow(${10 * g}px 0 0 rgba(255,0,70,.85)) drop-shadow(${-10 * g}px 0 0 rgba(0,230,255,.85))` : "";
+      camv = Object.assign({}, camv, {px: camv.px + j});
+      CAM = camv;
+      hlRows(19, 19, 1, 29, "#E74856", clamp((t - T.drop - .15) / .2), .10);
+    }
+    const a = fadeIO(t, b(2), T.coldStart - .05, .2, .12);
+    hlRows(10, 10, 74, 80, "#E74856", t < T.drop ? a : 0, .12);
+    cap(`${N.smiUtil}% busy. Running&hellip; nothing?`, null, "#E74856", 960, 890, a, "center");
+  }
+  // 3-5: gputree cold start, branches, WSL callout, Jev verdict
+  else if (t < T.watch) {
+    shotState = t < T.coldStart + .05 ? blankPrompt(t) : shot(t, "cold", T.coldStart + .08, T.coldEnter - .1, T.coldEnter);
+    const top = fit(0, 7, 0, 99, 1.12, 960, 250);
+    camv = camBetween(t, [[T.coldStart, FULL], [T.jev, top, .5]]);
+    CAM = camv;
+    const since = t - T.coldEnter;
+    if (since > 0 && t < T.jev) {
+      cap(`first frame in ${N.first} ms`, "gputree --timing: phase 1 drawn", "#61D6D6", 1840, 900, fadeIO(t, T.coldEnter, b(9) - .05, .08, .15), "right");
+      const groups = [[8, 12, "#E74856"], [13, 16, "#3B78FF"], [17, 20, "#D65AD0"], [21, 25, "#F5C84C"], [26, 29, "#16C60C"]];
+      groups.forEach(([r0, r1, c], i) => { const s0 = b(8 + i * .5); hlRows(r0, r1, 0, 99, c, fadeIO(t, s0, s0 + .5, .06, .35), .10); });
+      // WSL callout
+      const a = fadeIO(t, b(9), T.jev, .15, .15);
+      if (a > 0) {
+        hlRows(11, 11, 34, 99, "#E74856", a, .16);
+        // box in the empty top-right (rows 3-4), leader down the right margin to the WSL row
+        const [bx, by] = toStage(qx(99.8), qy(3) - 4), [lx, ly] = toStage(qx(100) + 14, qy(11.5));
+        H += `<svg class="lines" style="opacity:${a}"><polyline points="${lx},${by + 60} ${lx},${ly} ${lx - 14},${ly}" fill="none" stroke="#E74856" stroke-width="4"/></svg>`;
+        H += `<div class="callout" style="left:${bx}px;top:${by}px;opacity:${a};transform:translateX(-100%)">nvidia-smi can't see inside WSL</div>`;
+      }
+    }
+    if (t >= T.jev) {
+      const a = fadeIO(t, T.jev + .25, T.watch - .02, .2, .12);
+      spot(1, 1, 0, 99, a);
+      hlRows(1, 1, 84, 99, "#61D6D6", a, .12);
+      cap("Plain-English verdict, picked by Jev,", "TypeSafe's typed-decision model", "#61D6D6", 960, 560, a, "center");
+    }
+  }
+  // 6: live watch
+  else if (t < T.off) {
+    shotState = shot(t, "watch", T.watch + .05, T.watchEnter - .1, T.watchEnter, 1.115);
+    camv = FULL; CAM = camv;
+    cap("live: <b>gputree -w .5</b>", null, "#16C60C", 1840, 910, fadeIO(t, b(17), T.off - .02, .15, .1), "right");
+    if (MODE === "gif") { // fade to the blank prompt the loop starts on
+      const f = clamp((t - (T.gifEnd - .4)) / .35);
+      if (f > 0) H += `<div style="position:absolute;left:${WX + 4}px;top:${WY + TAB + 2}px;width:${WW - 8}px;height:${WH - TAB - 2}px;background:#0C0C0C;opacity:${f}"><div class="term" style="left:${PADL - 4}px;top:${PADT - 2}px">${esc(P)}</div></div>`;
+    }
+  }
+  // 7: offline drama
+  else if (t < T.race) {
+    const e0 = b(23 + GIF_EXTRA);
+    shotState = t < e0 ? shot(t, "watch", 0, 0, T.watchEnter, 1.115) : shot(t, "offline", e0 + .05, T.offEnter - .06, T.offEnter);
+    const top = fit(0, 7, 0, 99, 1.12, 960, 250);
+    camv = camBetween(t, [[T.off, FULL], [b(26), top, .45]]); CAM = camv;
+    const back = b(28);
+    const desat = Math.min(clamp((t - T.off) / .45), 1 - clamp((t - back) / .4));
+    filter = desat > 0 ? `grayscale(${desat}) brightness(${1 - .25 * desat})` : "";
+    const slash = clamp((t - T.off) / .3) * (1 - clamp((t - back) / .3));
+    wifi(1790, 770, slash, fadeIO(t, T.off - .05, T.race - .05, .12, .25));
+    const ta = fadeIO(t, T.off + .12, back + .1, .22, .25);
+    if (ta > 0) H += `<div class="toast" style="left:${1740 - 560 + (1 - ta) * 120}px;top:${840}px;opacity:${ta}"><div class="app">&#9679; Network</div><div class="t">No internet connection</div><div class="s">Jev can't be reached.</div></div>`;
+    H += `<div class="fine" style="left:56px;top:1030px;opacity:${fadeIO(t, T.off, T.race - .1)}">staged: Jev endpoint pointed at an unreachable address (GPUTREE_JEV_URL)</div>`;
+    // real measured wait for the fallback
+    if (t > T.offEnter && t < b(26)) { const [x, y] = toStage(qx(99), qy(3)); cap(`calling Jev&hellip; ${((t - T.offEnter)).toFixed(1)} s`, null, "#8a939c", x, y - 2, 1, "right"); }
+    const a = fadeIO(t, b(26) + .1, T.race - .02, .2, .12);
+    spot(1, 1, 0, 83, a);
+    hlRows(1, 1, 0, 83, "#CCCCCC", a, .07);
+    cap("Jev out of reach?", `Local rules say it just as plainly. (fallback in ${N.offline.toFixed(2)} s)`, "#CCCCCC", 960, 560, a, "center");
+  }
+  // 8: speed race
+  else if (t < T.cpu) {
+    showWin = false; race.style.display = "block";
+    const e = T.raceEnter, fast = 9;
+    const L = t < e ? shot(t, "legacy", T.race + .02, e - .05, e) : shot(t, "legacy", 0, 0, e, 1 / fast);
+    const R = t < e ? shot(t, "cold", T.race + .02, e - .15, e) : shot(t, "cold", 0, 0, e);
+    const realL = Math.max(0, (t - e) * fast), realR = Math.max(0, (t - e));
+    const lDone = realL * 1000 >= S.legacy.first_byte_ms, rDone = realR * 1000 >= N.first;
+    const lv = t < e ? "&nbsp;" : lDone ? `${N.legacy.toFixed(1)} s` : `${realL.toFixed(1)} s&hellip;`;
+    const rv = t < e ? "&nbsp;" : rDone ? `${N.first} ms &#10003;` : `${Math.round(realR * 1000)} ms`;
+    race.innerHTML = `
+     <div class="pane" style="left:40px"><div class="hdr"><div class="n">old: PowerShell 5.1 &middot; time-lapse &times;${fast}</div><div class="v" style="color:${lDone ? "#F5C84C" : "#9aa3ad"}">${lv}${!lDone && t > e ? ' <span style="font-size:30px;color:#777">still loading</span>' : ""}</div></div>
+       <div class="term" style="left:14px;top:132px">${rowsHTML(L.rows)}</div></div>
+     <div class="pane" style="left:980px"><div class="hdr"><div class="n">gputree (Rust) &middot; real time</div><div class="v" style="color:#16C60C">${rv}</div></div>
+       <div class="term" style="left:14px;top:132px">${rowsHTML(R.rows)}</div></div>`;
+    const a = fadeIO(t, e + .3, T.cpu - .02, .2, .12);
+    cap(`Rust + Windows' native perf counters: ${N.read} ms reads.`, `The PowerShell version took ${N.legacy.toFixed(1)} s to print anything.`, "#F5C84C", 960, 830, a, "center");
+  }
+  // 9: cputree
+  else if (t < T.end) {
+    shotState = shot(t, "cpu", T.cpu + .04, T.cpuEnter - .08, T.cpuEnter);
+    camv = FULL; CAM = camv;
+    hlRows(13, 19, 0, 99, "#E74856", fadeIO(t, b(37), T.end, .15, .1), .10);
+    cap("+ <b>cputree</b>: the whole process tree, CPU rolled up", null, "#61D6D6", 960, 900, fadeIO(t, b(36), T.end - .02, .15, .1), "center");
+  }
+  // 10: end card
+  else {
+    showWin = false; end.style.display = "flex";
+    const a = k => clamp((t - b(k)) / .18);
+    const fade = 1 - clamp((t - (T.total - .5)) / .5);
+    end.style.opacity = fade;
+    end.innerHTML = `
+      <div class="t1" style="opacity:${a(39)}">gputree</div>
+      <div class="t2" style="opacity:${a(39.5)}">nvidia-smi, but it tells you what's actually running</div>
+      <div class="chips" style="opacity:${a(40.5)}"><span style="color:#E74856">[training]</span><span style="color:#16C60C">[game]</span><span style="color:#F9F1A5">[video render]</span><span style="color:#D65AD0">[ai inference]</span></div>
+      <div class="t3" style="opacity:${a(41)}">github.com/gshklovs/gputree &middot; Windows &middot; Rust</div>
+      <div class="t4" style="opacity:${a(42)}">inspired by tobi/disktree &middot; headlines by Jev</div>`;
+  }
+  // apply
+  win.style.display = showWin ? "block" : "none";
+  if (showWin && shotState) { if (term._k !== shotState.key) { term.innerHTML = rowsHTML(shotState.rows); term._k = shotState.key; } }
+  cam.style.transform = `translate(${camv.px - camv.s * camv.qx}px,${camv.py - camv.s * camv.qy}px) scale(${camv.s})`;
+  cam.style.filter = filter;
+  ov.innerHTML = H;
+}
+window.__T = T; window.__N = N; window.__total = T.total; window.__mode = MODE;
+document.fonts.load('28px "CM"').then(() => { measure(); window.__render = render; render(parseFloat(new URLSearchParams(location.search).get("t") || "0")); });
+</script>
+</body></html>

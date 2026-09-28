@@ -1,0 +1,146 @@
+[1mSampling[0m[1m GPU[0m[1m load…[0m[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 17:01:48[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[K
+[2m mem[0m  [38;5;179;48;5;236m█████▋      [0m   3.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m           [2m    …[0m  [2msampling…[0m[K
+[2m tags[0m [35m[vm][0m[2m 2.6 GiB[0m  [1;35m[ai inference][0m[2m 458 MiB[0m  [1;33m[video render][0m[2m 297 MiB[0m  [2m[other][0m[2m 220 MiB[0m  [1;32m[game][0m[2m 138 Mi[0m[2m…[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB [2m    …[0m  vmwp[35m (WSL2 VM)[0m  [35m[vm][0m          [2m  pid 21712[0m[K
+[2m│  └─ [0m             [2m   80 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▊           [0m   458 MiB [2m    …[0m  llama-server    [1;35m[ai inference][0m[2m  pid 5656[0m[K
+[2m│  └─ [0m             [2m   14 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▌           [0m   297 MiB [2m    …[0m  ffmpeg          [1;33m[video render][0m[2m  pid 7892[0m[K
+[2m│  └─ [0m             [2m  449 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▍           [0m   220 MiB [2m    …[0m  Studio          [2m[other][0m       [2m  pid 33080[0m[K
+[2m│  └─ [0m             [2m   14 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m   138 MiB [2m    …[0m  SlayTheSpire2   [1;32m[game][0m        [2m  pid 36480[0m[K
+[2m│  └─ [0m             [2m  110 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB [2m    …[0m  System          [2m[system][0m      [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 7 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▉          [0m   2.9 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m           [2m    …[0m  [2msampling…[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.9 GiB[0m  [36m[browser][0m[2m 390 MiB[0m  [37m[terminal][0m[2m 262 MiB[0m  [37m[app][0m[2m 261 MiB[0m  [2m[other][0m[2m 68 MiB[0m  [32m[la[0m[2m…[0m[K
+[2m├──── [0m[38;5;108;48;5;236m█           [0m  ~1.5 GiB [2m    …[0m  dwm             [2m[desktop][0m     [2m  pid 2592[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~377 MiB [2m    …[0m  chrome          [36m[browser][0m     [2m  pid 23104[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▏           [0m  ~262 MiB [2m    …[0m  WindowsTerminal [37m[terminal][0m    [2m  pid 20628[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▏           [0m  ~163 MiB [2m    …[0m  explorer        [2m[desktop][0m     [2m  pid 9884[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▏           [0m  ~113 MiB [2m    …[0m  msedgewebview2  [37m[app][0m         [2m  pid 29408[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▏           [0m   ~80 MiB [2m    …[0m  Slack           [37m[app][0m         [2m  pid 27952[0m[K
+[2m└──── [0m             [2m  457 MiB[0m        [2m+ 33 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m    50 MiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m           [2m    …[0m  [2msampling…[0m[K
+[2m tags[0m [2m[audio][0m[2m 50 MiB[0m[K
+[2m└──── [0m             [2m   50 MiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[2m~[0m[2m shared[0m[2m memory[0m[2m scaled[0m[2m to[0m[2m fit[0m[2m the[0m[2m adapter:[0m[2m Windows[0m[2m counts[0m[2m pages[0m[2m several[0m[2m processes[0m[2m map[0m[2m once[0m[2m per[0m[K
+[2mprocess.[0m[K
+[J[39FYour NVIDIA RTX 5060 is [1m97%[0m[1m busy[0m — mostly [1;32ma[0m[1;32m game[0m[1;32m (SlayTheSpire2)[0m.[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 17:01:48[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[K
+[2m mem[0m  [38;5;179;48;5;236m█████▋      [0m   3.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;167;48;5;236m███████████▋[0m             97%  [2m3d 97% · copy 72% · videoencode 16%[0m[K
+[2m tags[0m [35m[vm][0m[2m 2.6 GiB 46%[0m  [1;35m[ai inference][0m[2m 458 MiB 0%[0m  [1;33m[video render][0m[2m 297 MiB 16%[0m  [2m[other][0m[2m 220 MiB 0%[0m [2m…[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   46%  vmwp[35m (WSL2 VM)[0m [35m[vm][0m          [2m  pid 21712[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▊           [0m   458 MiB    0%  llama-server   [1;35m[ai inference][0m[2m  pid 5656[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▌           [0m   297 MiB   16%  ffmpeg         [1;33m[video render][0m[2m  pid 7892[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▍           [0m   220 MiB    0%  Studio         [2m[other][0m       [2m  pid 33080[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m   138 MiB   70%  SlayTheSpire2  [1;32m[game][0m        [2m  pid 36480[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System         [2m[system][0m      [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 8 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▉          [0m   2.9 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m▌           [0m              4%  [2m3d 4%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.9 GiB 1%[0m  [36m[browser][0m[2m 390 MiB 0%[0m  [37m[terminal][0m[2m 262 MiB 3%[0m  [37m[app][0m[2m 261 MiB 0%[0m  [2m[other][0m[2m…[0m[K
+[2m└──── [0m             [2m  2.9 GiB[0m        [2m+ 39 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m    50 MiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m tags[0m [2m[audio][0m[2m 50 MiB 0%[0m[K
+[2m└──── [0m             [2m   50 MiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[J[26FYour NVIDIA RTX 5060 is [1m97%[0m[1m busy[0m — mostly [1;32ma[0m[1;32m game[0m[1;32m (SlayTheSpire2)[0m.[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 17:01:48[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[2m  75°C · 48 W[0m[K
+[2m mem[0m  [38;5;179;48;5;236m█████▋      [0m   3.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;167;48;5;236m███████████▋[0m             97%  [2m3d 97% · copy 72% · videoencode 16%[0m[K
+[2m tags[0m [35m[vm][0m[2m 2.6 GiB 46%[0m  [1;35m[ai inference][0m[2m 458 MiB 0%[0m  [1;33m[video render][0m[2m 297 MiB 16%[0m  [2m[other][0m[2m 220 MiB 0%[0m [2m…[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   46%  vmwp[35m (WSL2 VM)[0m [35m[vm][0m          [2m  pid 21712[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▊           [0m   458 MiB    0%  llama-server   [1;35m[ai inference][0m[2m  pid 5656[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▌           [0m   297 MiB   16%  ffmpeg         [1;33m[video render][0m[2m  pid 7892[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▍           [0m   220 MiB    0%  Studio         [2m[other][0m       [2m  pid 33080[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m   138 MiB   70%  SlayTheSpire2  [1;32m[game][0m        [2m  pid 36480[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System         [2m[system][0m      [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 8 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▉          [0m   2.9 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m▌           [0m              4%  [2m3d 4%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.9 GiB 1%[0m  [36m[browser][0m[2m 390 MiB 0%[0m  [37m[terminal][0m[2m 262 MiB 3%[0m  [37m[app][0m[2m 261 MiB 0%[0m  [2m[other][0m[2m…[0m[K
+[2m└──── [0m             [2m  2.9 GiB[0m        [2m+ 39 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m    50 MiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m tags[0m [2m[audio][0m[2m 50 MiB 0%[0m[K
+[2m└──── [0m             [2m   50 MiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[J[26FYour NVIDIA RTX 5060 is [1m97%[0m[1m busy[0m — mostly [1;32ma[0m[1;32m game[0m[1;32m (SlayTheSpire2)[0m.[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 17:01:48[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[2m  75°C · 48 W[0m[K
+[2m mem[0m  [38;5;179;48;5;236m█████▋      [0m   3.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;167;48;5;236m███████████▋[0m             97%  [2m3d 97% · copy 72% · videoencode 16%[0m[K
+[2m tags[0m [1;31m[training][0m[2m 2.6 GiB 46%[0m  [1;35m[ai inference][0m[2m 458 MiB 0%[0m  [1;33m[video render][0m[2m 297 MiB 16%[0m  [2m[other][0m[2m 220 M[0m[2m…[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   46%  vmwp[35m (WSL2 VM)[0m                        [1;31m[training][0m    [2m  pid 21712[0m[K
+[2m│  └─ [0m             [2m  2.8 GiB[0m        [1mtrain bd1-walk-flat[0m[2m  (microduck_rl)[0m   [1;31m[training][0m    [2m  pid 70252[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▊           [0m   458 MiB    0%  llama-server                          [1;35m[ai inference][0m[2m  pid 5656[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▌           [0m   297 MiB   16%  ffmpeg                                [1;33m[video render][0m[2m  pid 7892[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▍           [0m   220 MiB    0%  Studio                                [2m[other][0m       [2m  pid 33080[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m   138 MiB   70%  SlayTheSpire2                         [1;32m[game][0m        [2m  pid 36480[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System                                [2m[system][0m      [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 8 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▉          [0m   2.9 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m▌           [0m              4%  [2m3d 4%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.9 GiB 1%[0m  [36m[browser][0m[2m 390 MiB 0%[0m  [37m[terminal][0m[2m 262 MiB 3%[0m  [37m[app][0m[2m 261 MiB 0%[0m  [2m[other][0m[2m…[0m[K
+[2m└──── [0m             [2m  2.9 GiB[0m        [2m+ 39 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m    50 MiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m tags[0m [2m[audio][0m[2m 50 MiB 0%[0m[K
+[2m└──── [0m             [2m   50 MiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[J[27FYour NVIDIA RTX 5060 is [1m97%[0m[1m busy[0m — mostly [1;32ma[0m[1;32m game[0m[1;32m (SlayTheSpire2)[0m.[2m  ·[0m[2m jev[0m[2m (+2[0m[2m tags)[0m[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 17:01:48[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[2m  75°C · 48 W[0m[K
+[2m mem[0m  [38;5;179;48;5;236m█████▋      [0m   3.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;167;48;5;236m███████████▋[0m             97%  [2m3d 97% · copy 72% · videoencode 16%[0m[K
+[2m tags[0m [1;31m[training][0m[2m 2.6 GiB 46%[0m  [1;35m[ai inference][0m[2m 458 MiB 0%[0m  [1;33m[video render][0m[2m 297 MiB 16%[0m  [2m[other][0m[2m 220 M[0m[2m…[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   46%  vmwp[35m (WSL2 VM)[0m                        [1;31m[training][0m    [2m  pid 21712[0m[K
+[2m│  └─ [0m             [2m  2.8 GiB[0m        [1mtrain bd1-walk-flat[0m[2m  (microduck_rl)[0m   [1;31m[training][0m    [2m  pid 70252[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▊           [0m   458 MiB    0%  llama-server                          [1;35m[ai inference][0m[2m  pid 5656[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▌           [0m   297 MiB   16%  ffmpeg                                [1;33m[video render][0m[2m  pid 7892[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▍           [0m   220 MiB    0%  Studio                                [2m[other][0m       [2m  pid 33080[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m   138 MiB   70%  SlayTheSpire2                         [1;32m[game][0m        [2m  pid 36480[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System                                [2m[system][0m      [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 8 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▉          [0m   2.9 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m▌           [0m              4%  [2m3d 4%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.9 GiB 1%[0m  [36m[browser][0m[2m 390 MiB 0%[0m  [37m[terminal][0m[2m 272 MiB 3%[0m  [37m[app][0m[2m 261 MiB 0%[0m  [32m[launch[0m[2m…[0m[K
+[2m└──── [0m             [2m  2.9 GiB[0m        [2m+ 39 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m    50 MiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m tags[0m [2m[audio][0m[2m 50 MiB 0%[0m[K
+[2m└──── [0m             [2m   50 MiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[J

@@ -1,0 +1,376 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>gputree launch v2</title>
+<style>
+@font-face{font-family:"CM";src:url("CascadiaMono.ttf");font-weight:200 700}
+:root{--term:#0C0C0C;--fg:#CCCCCC}
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:radial-gradient(1200px 700px at 50% 40%,#10151b,#050607);font-family:"CM",monospace;color:#eee}
+#cam{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+.win{position:absolute;background:var(--term);border-radius:10px;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px #2a2d31;overflow:hidden}
+.tabbar{position:absolute;left:0;top:0;right:0;height:42px;background:#1b1d20;display:flex;align-items:flex-end;padding-left:10px}
+.tab{height:34px;padding:0 18px;background:var(--term);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px;font:15px "Segoe UI",sans-serif;color:#ddd}
+.tab i{width:14px;height:14px;border-radius:3px;background:#2d64b8;display:inline-block}
+.ctrls{position:absolute;right:0;top:0;height:42px;display:flex}
+.ctrls span{width:54px;height:42px;display:flex;align-items:center;justify-content:center;color:#aaa;font:14px "Segoe UI",sans-serif}
+.term{position:absolute;white-space:pre;font-size:27.3067px;line-height:30px;color:var(--fg);font-family:"CM",monospace;font-variant-ligatures:none}
+.term div{height:30px}
+.b{font-weight:700}.d{opacity:.55}
+.bar{text-shadow:.6px 0 currentColor,-.6px 0 currentColor}
+#camov{position:absolute;left:0;top:0;width:1920px;height:1080px;pointer-events:none}
+#ov{position:absolute;inset:0;pointer-events:none}
+svg.lines{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:visible}
+/* caption system: kicker (tiny caps) over a reverse-video, typed line with a block cursor */
+.cb{position:absolute;white-space:nowrap}
+.kick{display:table;font-size:21px;letter-spacing:.28em;font-weight:700;margin:0 0 8px 0;padding:2px 10px 2px 12px;background:rgba(12,12,12,.94);border-radius:3px}
+.rv{display:inline-block;font-size:44px;line-height:58px;padding:0 12px;color:#0C0C0C;font-weight:600}
+.rvl{display:table;margin-top:6px}
+.rvl:first-of-type{margin-top:0}
+.cur{display:inline-block;width:.58em;height:.92em;vertical-align:-.1em;margin-left:2px}
+.hero{display:inline-flex;align-items:baseline;gap:10px;font-weight:700;line-height:1}
+.hero .n{font-size:132px;letter-spacing:-3px}
+.hero .u{font-size:44px;font-weight:600}
+.pane{position:absolute;top:40px;height:780px;width:900px;background:var(--term);border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 1px #2a2d31}
+.pane .hdr{position:absolute;left:0;right:0;top:0;height:190px;background:#15181b;padding:18px 26px;box-sizing:border-box}
+.pane .term{font-size:14.5px;line-height:17px}
+.pane .term div{height:17px}
+.toast{position:absolute;width:520px;padding:20px 24px;background:#2b2b2b;border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.6);font-family:"Segoe UI",sans-serif;color:#fff;border:1px solid #3a3a3a}
+.toast .t{font-size:28px;font-weight:600}.toast .s{font-size:21px;color:#bbb;margin-top:6px}
+.toast .app{font-size:17px;color:#aaa;margin-bottom:8px}
+.fine{position:absolute;font-size:19px;color:#9aa3ad;background:rgba(8,9,11,.92);padding:5px 12px;border-radius:5px}
+.cmp{position:absolute;left:60px;right:60px;background:#0C0C0C;isolation:isolate;z-index:5;border-radius:8px;box-shadow:0 0 0 1px #2a2d31,0 20px 60px rgba(0,0,0,.6);padding:22px 30px}
+.cmp .term{position:relative;font-size:30.72px;line-height:38px}
+.cmp .term div{height:38px}
+#end{position:absolute;inset:0;background:#060708}
+</style></head>
+<body>
+<div id="stage">
+  <div id="cam"><div class="win" id="win"><div class="tabbar"><div class="tab"><i></i>Windows PowerShell</div></div>
+    <div class="ctrls"><span>&#8212;</span><span>&#9633;</span><span>&#10005;</span></div>
+    <div class="term" id="term"></div></div>
+    <div id="camov"></div></div>
+  <div id="race" style="position:absolute;inset:0;display:none"></div>
+  <div id="end" style="display:none"></div>
+  <div id="ov"></div>
+</div>
+<script src="screens.js"></script>
+<script src="beats.js"></script>
+<script>
+const MODE = location.hash.includes("gif") ? "gif" : "video";
+const B = window.BEATS, S = window.SCREENS;
+const WX = 40, WY = 24, WW = 1840, WH = 1032, TAB = 42, PADL = 22, PADT = 12, RH = 30;
+const win = document.getElementById("win"), term = document.getElementById("term"), cam = document.getElementById("cam");
+const camov = document.getElementById("camov"), ov = document.getElementById("ov"), race = document.getElementById("race"), end = document.getElementById("end");
+Object.assign(win.style, {left: WX + "px", top: WY + "px", width: WW + "px", height: WH + "px"});
+Object.assign(term.style, {left: PADL + "px", top: TAB + PADT + "px"});
+let CW = 16;
+const CAPW = 44 * 0.5859;   // caption char advance (Cascadia Mono)
+function measure() { const c = document.createElement("canvas").getContext("2d"); c.font = '27.3067px "CM"'; CW = c.measureText("0".repeat(100)).width / 100; }
+
+const C = {train: "#E74856", jev: "#D65AD0", speed: "#F5C84C", game: "#16C60C", gray: "#C8CDD2", ai: "#D65AD0", render: "#F9F1A5"};
+
+// ---------- numbers read from the captures ----------
+const ms = (cap, key) => parseFloat((S[cap].stderr.find(l => l.s.includes(key)) || {s: "NaN"}).s);
+const rowText = r => r.map(x => x[0]).join("");
+const finalRows = k => S[k].snaps.at(-1).rows;
+const N = {
+  first: Math.round(ms("cold", "phase1 drawn")),
+  read: ms("cold", "counters open"),
+  legacy: S.legacy.first_byte_ms / 1000,
+  offline: ms("offline", "final drawn") / 1000,
+  smiUtil: (finalRows("smi").map(rowText).join("\n").match(/(\d+)%\s+Default/) || [])[1],
+  smiApps: finalRows("smi").map(rowText).filter(t => /^\|\s+0\s+N\/A\s+N\/A/.test(t)).length,
+};
+const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+
+// ---------- helpers ----------
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const lerp = (a, b, x) => a + (b - a) * x;
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+function rowsHTML(rows) {
+  return rows.map(r => "<div>" + r.map(([t, fg, bg, fl]) => {
+    let st = `color:${fg}`; if (bg) st += `;background:${bg}`;
+    const cls = (fl & 1 ? "b " : "") + (fl & 2 ? "d " : "") + (/[▀-▟]/.test(t) ? "bar" : "");
+    return `<span class="${cls}" style="${st}">${esc(t)}</span>`;
+  }).join("") + "</div>").join("");
+}
+function snapAt(cap, msSince) { const sn = S[cap].snaps; let s = null; for (const x of sn) { if (x.t <= msSince) s = x; else break; } return s; }
+const P = S.cold.prompt;
+function promptRow(typed, cursorOn) { return [[P + typed, "#CCCCCC", null, 0]].concat(cursorOn ? [[" ", "#0C0C0C", "#CCCCCC", 0]] : []); }
+// a terminal shot: type the command over t0..t1, Enter at te, then the capture at real time (x stretch)
+function shot(t, cap, t0, t1, te, stretch = 1) {
+  const cmd = S[cap].cmd;
+  if (t < te) {
+    const n = Math.round(clamp((t - t0) / Math.max(.001, t1 - t0)) * cmd.length);
+    const blink = t < t0 || t > t1 ? (Math.floor(t * 2.2) % 2 === 0) : true;
+    return {key: cap + "p" + n + blink, rows: [promptRow(cmd.slice(0, n), blink)]};
+  }
+  const s = snapAt(cap, (t - te) * 1000 / stretch);
+  return {key: cap + s.t, rows: s.rows};
+}
+// window-local cell -> cam space; cam space -> stage
+const qx = c => WX + PADL + c * CW, qy = r => WY + TAB + PADT + r * RH;
+let CAM = {s: 1, qx: 960, qy: 540, px: 960, py: 540};
+const toStage = (x, y) => [CAM.px + CAM.s * (x - CAM.qx), CAM.py + CAM.s * (y - CAM.qy)];
+function camBetween(t, keys) { // [t, v, dur]: at t start easing to v over dur
+  let cur = keys[0][1];
+  for (let i = 1; i < keys.length; i++) {
+    const [kt, v, dur] = keys[i];
+    if (t < kt) break;
+    const x = ease((t - kt) / (dur || .45)), o = {};
+    for (const k of ["s", "qx", "qy", "px", "py"]) o[k] = lerp(cur[k], v[k], x);
+    cur = o;
+  }
+  return cur;
+}
+const fit = (r0, r1, c0, c1, s, px = 960, py = 540) => ({s, qx: (qx(c0) + qx(c1)) / 2, qy: (qy(r0) + qy(r1 + 1)) / 2, px, py});
+const NV = fit(0, 24, 0, 99, 1.12, 960, 464);            // the NVIDIA section, rows 0-24
+
+// ---------- overlay primitives ----------
+let H = "", HC = "";   // stage overlay, cam-space overlay
+const blinkOn = t => (t * 1.8) % 1 < .5;
+const typed = (s, t0, t) => s.slice(0, Math.max(0, Math.floor((t - t0) * 40)));
+/** kicker + optional hero number + reverse-video typed lines with a block cursor.
+    Returns the caption's box in stage space (for leader lines). */
+function caption(t, o) {
+  const a = fadeIO(t, o.t0 - .02, o.t1 ?? 1e9, .06, .12);
+  if (a <= 0) return null;
+  const lines = [].concat(o.text || []);
+  let t0 = o.t0 + (o.hero ? .12 : 0), html = "", w = 0, done = true;
+  lines.forEach((ln, i) => {
+    const shown = typed(ln, t0, t);
+    const last = shown.length < ln.length || i === lines.length - 1;
+    t0 += ln.length / 40 + .08;
+    if (!shown.length && i > 0) return;
+    const cur = last && (shown.length < ln.length || blinkOn(t)) ? `<span class="cur" style="background:#0C0C0C"></span>` : `<span class="cur"></span>`;
+    html += `<span class="rv rvl" style="background:${o.color}">${esc(shown)}${last ? cur : ""}</span>`;
+    w = Math.max(w, (shown.length + (last ? .7 : 0)) * CAPW + 24);
+    if (shown.length < ln.length) done = false;
+  });
+  const hero = o.hero ? `<div class="hero" style="color:${o.color}"><span class="n">${o.hero[0]}</span><span class="u">${o.hero[1]}</span></div>` : "";
+  const kick = o.kicker ? `<div class="kick" style="color:${o.color}">${o.kicker}</div>` : "";
+  const tr = o.anchor === "right" ? "translateX(-100%)" : o.anchor === "center" ? "translateX(-50%)" : "";
+  const heroSide = o.hero && o.heroSide;
+  const inner = heroSide ? `<div style="display:flex;align-items:flex-end;gap:28px">${hero}<div>${kick}${html}</div></div>` : `${kick}${hero}${hero ? '<div style="height:10px"></div>' : ""}${html}`;
+  H += `<div class="cb" style="left:${o.x}px;top:${o.y}px;opacity:${a};transform:${tr}">${inner}</div>`;
+  const x0 = o.anchor === "right" ? o.x - w : o.anchor === "center" ? o.x - w / 2 : o.x;
+  return {x0, x1: x0 + w, y0: o.y, a};
+}
+// faint row highlight in cam space (scales with the camera)
+function rowHL(r0, r1, c0, c1, color, a, fill = .13) {
+  if (a <= 0) return;
+  HC += `<div style="position:absolute;left:${qx(c0) - 4}px;top:${qy(r0)}px;width:${qx(c1 + 1) - qx(c0) + 8}px;height:${(r1 - r0 + 1) * RH}px;background:${color};opacity:${Math.min(1, fill * 2.2) * a};mix-blend-mode:screen"></div>`;
+}
+// reverse-video pick-out of cells, text taken from the live snapshot row
+function pick(rows, r, c0, len, color, a) {
+  if (a <= 0 || !rows[r]) return;
+  const txt = rowText(rows[r]).slice(c0, c0 + len);
+  HC += `<div class="term" style="left:${qx(c0) - 2}px;top:${qy(r)}px;opacity:${a}"><div><span style="background:${color};color:#0C0C0C;padding:0 2px;font-weight:700">${esc(txt)}</span></div></div>`;
+}
+function leader(x1, y1, x2, y2, color, a, elbow = false) {
+  if (a <= 0) return;
+  const pts = elbow ? `${x1},${y1} ${x1},${y2} ${x2},${y2}` : `${x1},${y1} ${x2},${y2}`;
+  H += `<svg class="lines" style="opacity:${a}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/><circle cx="${x2}" cy="${y2}" r="4" fill="${color}"/></svg>`;
+}
+function spot(r0, r1, c0, c1, a) {
+  if (a <= 0) return;
+  HC += `<div style="position:absolute;left:${qx(c0) - 8}px;top:${qy(r0) - 3}px;width:${qx(c1 + 1) - qx(c0) + 16}px;height:${(r1 - r0 + 1) * RH + 6}px;box-shadow:0 0 0 6000px rgba(0,0,0,${.62 * a})"></div>`;
+}
+// per-row dimming: like spot(), but each row can be lifted (keep[row] = 0..1)
+function dimRows(r0, r1, keep, a) {
+  if (a <= 0) return;
+  for (let r = r0; r <= r1; r++) {
+    const d = .62 * a * (1 - (keep[r] || 0));
+    if (d > .005) HC += `<div style="position:absolute;left:${qx(-6)}px;top:${qy(r)}px;width:${qx(140) - qx(-6)}px;height:${RH}px;background:#000;opacity:${d}"></div>`;
+  }
+  HC += `<div style="position:absolute;left:${qx(-6)}px;top:${qy(0) - 4000}px;width:${qx(140) - qx(-6)}px;height:4000px;background:#000;opacity:${.62 * a}"></div>`;
+}
+function fadeIO(t, a, b, fi = .18, fo = .18) { return Math.min(clamp((t - a) / fi), clamp((b - t) / fo)); }
+function wifi(x, y, slash, a) {
+  if (a <= 0) return;
+  const L = 150;
+  H += `<svg class="lines" style="opacity:${a}"><g transform="translate(${x},${y})" fill="none" stroke-linecap="round">
+   <path d="M-44 -6 A62 62 0 0 1 44 -6" stroke="#eee" stroke-width="9"/><path d="M-28 12 A38 38 0 0 1 28 12" stroke="#eee" stroke-width="9"/>
+   <circle cx="0" cy="30" r="7" fill="#eee" stroke="none"/>
+   <line x1="-50" y1="-40" x2="50" y2="44" stroke="#0C0C0C" stroke-width="20" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - slash)}"/>
+   <line x1="-50" y1="-40" x2="50" y2="44" stroke="#E74856" stroke-width="9" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - slash)}"/></g></svg>`;
+}
+// find a phrase in the final headline rows: -> {r, c, len}
+function find(rows, needle, r = 0) { const i = rowText(rows[r] || []).indexOf(needle); return i < 0 ? null : {r, c: i, len: needle.length}; }
+
+// ---------- timeline (beats of the real track, 107.7 BPM) ----------
+const b = k => B[Math.floor(k)] + (k % 1) * (B[Math.floor(k) + 1] - B[Math.floor(k)]);
+const T = {
+  smiEnter: b(1) - S.smi.first_byte_ms / 1000, drop: b(4),
+  cold: b(6), coldEnter: b(6.5) - N.first / 1000, wsl: b(11), jev: b(14), back: b(21),
+  watch: b(24), off: b(30), offEnter: b(31) - ms("offline", "phase1 drawn") / 1000, cmp: b(34), release: b(38),
+  race: b(38), cpu: b(43), end: b(47), total: 28.0,
+};
+T.gifStart = T.cold; T.gifEnd = T.watch;
+const HEAD = finalRows("cold"), OFFR = finalRows("offline");
+
+function render(t) {
+  H = ""; HC = ""; let st = null, camv = NV, filter = "", showWin = true;
+  race.style.display = "none"; end.style.display = "none";
+
+  // 1-2 · nvidia-smi hook, glitch-cut on the kick
+  if (t < T.cold) {
+    st = shot(t, "smi", .06, T.smiEnter - .06, T.smiEnter);
+    const table = fit(0, 23, 0, 90, 1.1, 960, 410), list = fit(14, 23, 0, 90, 1.3, 960, 640);
+    camv = camBetween(t, [[0, table], [T.drop, list, .2]]); CAM = camv;
+    if (t >= T.drop) {
+      const g = clamp(1 - (t - T.drop) / .3), j = Math.sin(t * 997) * 16 * g;
+      filter = g > 0 ? `drop-shadow(${11 * g}px 0 0 rgba(255,0,70,.85)) drop-shadow(${-11 * g}px 0 0 rgba(0,230,255,.85))` : "";
+      camv = Object.assign({}, camv, {px: camv.px + j}); CAM = camv;
+    }
+    if (t < T.drop) {
+      const a = fadeIO(t, b(2), T.drop, .1, .06);
+      rowHL(10, 10, 72, 80, C.train, a, .22);
+      const box = caption(t, {t0: b(2), t1: T.drop, x: 70, y: 880, color: C.train, kicker: "NVIDIA-SMI", hero: [N.smiUtil + "%", "busy"], heroSide: true,
+        text: `and it lists ${WORDS[N.smiApps] || N.smiApps} apps.`});
+      if (box) { const [x, y] = toStage(qx(76), qy(11)); leader(x, y, x, 870, C.train, box.a); }
+    } else {
+      const a = fadeIO(t, T.drop + .15, T.cold, .1, .05);
+      spot(19, 18 + N.smiApps, 0, 90, a);
+      rowHL(19, 18 + N.smiApps, 1, 89, C.train, a, .1);
+      const box = caption(t, {t0: T.drop + .2, t1: T.cold, x: 960, y: 200, anchor: "center", color: C.train, kicker: "NVIDIA-SMI",
+        text: "it misses the one using the most."});
+    }
+  }
+  // 3-5 · gputree: first frame, tree, wsl pointer
+  else if (t < T.jev) {
+    st = shot(t, "cold", T.cold + .02, T.coldEnter - .04, T.coldEnter);
+    camv = NV; CAM = camv;
+    if (t >= T.coldEnter && t < T.wsl) caption(t, {t0: T.coldEnter, t1: T.wsl, x: 1860, y: 872, anchor: "right", color: C.speed, kicker: "RUST", hero: [String(N.first), "ms"], heroSide: true, text: "first frame."});
+    // branch sweep on the beats, faint tag-coloured rows
+    const groups = [[8, 11, C.train], [12, 12, C.ai], [13, 16, C.speed], [20, 22, C.game]];
+    groups.forEach(([r0, r1, c], i) => { const s0 = b(8 + i * .5); rowHL(r0, r1, 0, 99, c, fadeIO(t, s0, s0 + .9, .06, .4), .14); });
+    if (t >= T.wsl) {
+      const a = fadeIO(t, T.wsl, T.jev, .08, .1);
+      rowHL(11, 11, 0, 99, C.train, a, .2);
+      const box = caption(t, {t0: T.wsl + .05, t1: T.jev, x: 1860, y: 900, anchor: "right", color: C.train, kicker: "WSL2", text: "nvidia-smi can't see inside wsl."});
+      if (box) { const [x, y] = toStage(qx(100.8), qy(11.5)); leader(x + 16, box.y0 - 4, x, y, C.train, a, true); }
+    }
+  }
+  // 6-7 · jev headline: zoom, pan across its key phrases, pull back
+  else if (t < T.watch) {
+    st = shot(t, "cold", 0, 0, T.coldEnter);
+    const z = 2.3, py = 238;
+    const p1 = find(HEAD, N.pctWords), p2 = find(HEAD, N.whatWords), p3 = find(HEAD, "WSL");
+    const at = (c) => ({s: z, qx: qx(c), qy: qy(.5), px: 960, py});
+    camv = camBetween(t, [[T.jev, NV], [T.jev, at(24), .5], [b(17), at(clamp(p2.c + p2.len / 2, 25, 74)), .45], [b(19), at(74), .45], [T.back, NV, .55]]);
+    CAM = camv;
+    const zoomed = 1 - clamp((t - T.back) / .4);
+    const picks = [[p1, b(15), C.gray, 6, 34], [p2, b(17), C.train, 8, 70], [p3, b(19), C.train, 11, 76]];
+    const keep = {0: 1, 1: 1};
+    for (const [p, s0, , row] of picks) if (p) keep[row] = Math.max(keep[row] || 0, fadeIO(t, s0, T.watch, .08, .1));
+    dimRows(2, 45, keep, zoomed);
+    for (const [p, s0, c, row, col] of picks) {
+      if (!p) continue;
+      const a = fadeIO(t, s0, T.watch, .08, .1);
+      pick(HEAD, p.r, p.c, p.len, c, a);
+      rowHL(row, row, 0, 99, c, a * (.6 + .4 * zoomed), .2);
+      const [x1, y1] = toStage(qx(p.c + p.len / 2), qy(p.r + 1));
+      const [x2, y2] = toStage(qx(col), qy(row + .5));
+      leader(x1, y1, x2, y2, c, a);
+    }
+    caption(t, {t0: T.jev + .1, t1: T.watch, x: 60, y: lerp(28, 890, ease((t - T.back) / .5)), color: C.jev, kicker: "JEV · TYPESAFE AI", text: "plain english, picked by jev."});
+    if (MODE === "gif") { // loop: fade to the blank prompt the GIF starts on
+      const f = clamp((t - (T.gifEnd - .4)) / .35);
+      if (f > 0) HC += `<div style="position:absolute;left:${WX + 4}px;top:${WY + TAB + 2}px;width:${WW - 8}px;height:${WH - TAB - 2}px;background:#0C0C0C;opacity:${f}"><div class="term" style="left:${PADL - 4}px;top:${PADT - 2}px">${esc(P)}</div></div>`;
+    }
+  }
+  // 9-10 · live
+  else if (t < T.off) {
+    st = shot(t, "watch", T.watch - 1, T.watch - .5, T.watch, 1.115);
+    camv = NV; CAM = camv;
+    caption(t, {t0: T.watch + .1, t1: T.off, x: 1860, y: 900, anchor: "right", color: C.game, kicker: "LIVE", text: "gputree -w .5 redraws in place."});
+  }
+  // 11-12 · offline: toast, desaturate, low-pass (in the mix), fallback, comparison
+  else if (t < T.race) {
+    st = t < T.offEnter ? shot(t, "watch", 0, 0, T.watch, 1.115) : shot(t, "offline", 0, 0, T.offEnter);
+    camv = camBetween(t, [[T.off, NV], [T.cmp, fit(0, 24, 0, 99, 1.12, 960, 520), .4]]); CAM = camv;
+    const back = T.release - .45;
+    const desat = Math.min(clamp((t - T.off) / .45), 1 - clamp((t - back) / .4));
+    filter = desat > 0 ? `grayscale(${desat}) brightness(${1 - .25 * desat})` : "";
+    const slash = clamp((t - T.off) / .3) * (1 - clamp((t - back) / .3));
+    const ta = fadeIO(t, T.off + .1, T.cmp, .2, .2);
+    wifi(1800, 790, slash, fadeIO(t, T.off - .02, T.race, .1, .2));
+    if (ta > 0) H += `<div class="toast" style="left:${1860 - 520 + (1 - ta) * 120}px;top:860px;opacity:${ta}"><div class="app">&#9679; Network</div><div class="t">No internet connection</div><div class="s">Jev can't be reached.</div></div>`;
+    H += `<div class="fine" style="left:56px;top:1036px;opacity:${fadeIO(t, T.off, T.race - .05)}">staged: Jev endpoint pointed at an unreachable address (GPUTREE_JEV_URL)</div>`;
+    if (t > T.offEnter && t < T.offEnter + N.offline) caption(t, {t0: T.offEnter, x: 1860, y: 84, anchor: "right", color: C.gray, kicker: "CALLING JEV", text: `${(t - T.offEnter).toFixed(1)} s…`});
+    if (t >= T.cmp) {
+      const a = fadeIO(t, T.cmp, T.race, .12, .1);
+      spot(0, 0, 0, 99, a * .0);
+      const jevRows = [HEAD[0], HEAD[1]].filter(Boolean), offRow = [OFFR[0]];
+      H += `<div class="cmp" style="top:250px;opacity:${a}"><div style="filter:${filter}">
+         <div class="kick" style="color:${C.jev}">JEV</div><div class="term">${rowsHTML(jevRows)}</div>
+         <div style="height:22px"></div>
+         <div class="kick" style="color:${C.gray}">LOCAL RULES · FALLBACK IN ${N.offline.toFixed(2)} S</div><div class="term">${rowsHTML(offRow)}</div></div></div>`;
+      caption(t, {t0: T.cmp + .15, t1: T.race, x: 960, y: 800, anchor: "center", color: C.gray, kicker: "OFFLINE", text: "jev out of reach? local rules, same plain english."});
+    }
+  }
+  // 13 · speed race
+  else if (t < T.cpu) {
+    showWin = false; race.style.display = "block";
+    const e = T.race + .12, fast = 4;
+    const L = t < e ? shot(t, "legacy", 0, 0, e) : shot(t, "legacy", 0, 0, e, 1 / fast);
+    const R = shot(t, "cold", 0, 0, e);
+    const realL = Math.max(0, (t - e) * fast), realR = Math.max(0, t - e);
+    const lDone = realL * 1000 >= S.legacy.first_byte_ms, rDone = realR * 1000 >= N.read + 1;
+    const lv = lDone ? [N.legacy.toFixed(1), "s"] : [realL.toFixed(1), "s…"];
+    const rv = rDone ? [N.read.toFixed(1), "ms"] : [(realR * 1000).toFixed(1), "ms"];
+    race.innerHTML = `
+     <div class="pane" style="left:40px"><div class="hdr"><div class="kick" style="color:#9aa3ad">POWERSHELL 5.1 · TIME-LAPSE ×${fast}</div>
+       <div class="hero" style="color:${lDone ? C.speed : "#8a939c"}"><span class="n">${lv[0]}</span><span class="u">${lv[1]}</span></div></div>
+       <div class="term" style="left:14px;top:204px">${rowsHTML(L.rows)}</div></div>
+     <div class="pane" style="left:980px"><div class="hdr"><div class="kick" style="color:${C.speed}">RUST · REAL TIME · COUNTER READ</div>
+       <div class="hero" style="color:${C.speed}"><span class="n">${rv[0]}</span><span class="u">${rv[1]}</span></div></div>
+       <div class="term" style="left:14px;top:204px">${rowsHTML(R.rows)}</div></div>`;
+    caption(t, {t0: e + .25, t1: T.cpu, x: 960, y: 872, anchor: "center", color: C.speed, kicker: "RUST",
+      text: [`native windows perf counters: ${N.read.toFixed(1)} ms reads.`, `powershell took ${N.legacy.toFixed(1)} s to print anything.`]});
+  }
+  // 14 · cputree
+  else if (t < T.end) {
+    st = shot(t, "cpu", T.cpu - 1, T.cpu - .5, T.cpu);
+    camv = fit(0, 30, 0, 99, 1.0, 960, 500); CAM = camv;
+    const a = fadeIO(t, b(44.5), T.end, .1, .08);
+    rowHL(13, 15, 0, 99, C.train, a, .18);
+    const box = caption(t, {t0: T.cpu + .1, t1: T.end, x: 1860, y: 900, anchor: "right", color: C.train, kicker: "ALSO IN THE BOX", text: "+ cputree: the whole process tree, cpu rolled up."});
+    if (box && a > 0) { const [x, y] = toStage(qx(100.8), qy(14.5)); leader(x + 16, box.y0 - 4, x, y, C.train, a, true); }
+  }
+  // 15-16 · end card, same caption system
+  else {
+    showWin = false; end.style.display = "block";
+    const fade = 1 - clamp((t - (T.total - .45)) / .45);
+    end.style.opacity = fade; ov.style.opacity = fade;
+    const k = x => clamp((t - b(x)) / .15);
+    H += `<div class="cb" style="left:960px;top:250px;transform:translateX(-50%);text-align:center;opacity:${k(47)}">
+            <div class="kick" style="color:${C.train}">WINDOWS · RUST · OPEN SOURCE</div>
+            <div class="hero" style="color:#F2F2F2"><span class="n" style="font-size:150px">gputree</span></div></div>`;
+    caption(t, {t0: b(47.5), x: 960, y: 520, anchor: "center", color: C.train, text: "nvidia-smi, but it tells you what's actually running."});
+    H += `<div class="cb" style="left:960px;top:640px;transform:translateX(-50%);opacity:${k(49)};font-size:30px;font-weight:700;display:flex;gap:22px">
+            <span style="color:${C.train}">[training]</span><span style="color:${C.game}">[game]</span><span style="color:${C.render}">[video render]</span><span style="color:${C.ai}">[ai inference]</span></div>
+          <div class="cb" style="left:960px;top:720px;transform:translateX(-50%);opacity:${k(49)};font-size:40px;color:#61D6D6">github.com/gshklovs/gputree</div>
+          <div class="cb" style="left:960px;top:800px;transform:translateX(-50%);opacity:${k(49.5)};font-size:24px;color:#7d858d">inspired by tobi/disktree · headlines by jev</div>`;
+  }
+  if (t < T.end) ov.style.opacity = MODE === "gif" ? 1 - clamp((t - (T.gifEnd - .4)) / .35) : 1;
+  win.style.display = showWin ? "block" : "none";
+  camov.style.display = showWin ? "block" : "none";
+  if (showWin && st) { if (term._k !== st.key) { term.innerHTML = rowsHTML(st.rows); term._k = st.key; } }
+  cam.style.transform = `translate(${camv.px - camv.s * camv.qx}px,${camv.py - camv.s * camv.qy}px) scale(${camv.s})`;
+  cam.style.filter = filter;
+  camov.innerHTML = HC;
+  ov.innerHTML = H;
+}
+// the headline's phrases, read from the real Jev line
+{
+  const h = rowText(HEAD[0]);
+  N.pctWords = (h.match(/\d+% busy/) || [""])[0];
+  N.whatWords = (h.match(/a training run|video rendering|a game|AI inference/) || [""])[0];
+  N.headline = h;
+}
+window.__T = T; window.__N = N; window.__total = T.total; window.__mode = MODE;
+document.fonts.load('27.3067px "CM"').then(() => { measure(); window.__render = render; render(parseFloat(new URLSearchParams(location.search).get("t") || "0")); });
+</script>
+</body></html>

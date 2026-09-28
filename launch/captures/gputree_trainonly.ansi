@@ -1,0 +1,213 @@
+[1mSampling[0m[1m GPU[0m[1m load…[0m[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 15:48:54[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[K
+[2m mem[0m  [38;5;179;48;5;236m████        [0m   2.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m           [2m    …[0m  [2msampling…[0m[K
+[2m tags[0m [35m[vm][0m[2m 2.6 GiB[0m  [2m[system][0m[2m 4 MiB[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB [2m    …[0m  vmwp[35m (WSL2 VM)[0m      [35m[vm][0m      [2m  pid 21712[0m[K
+[2m│  └─ [0m             [2m   80 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB [2m    …[0m  System              [2m[system][0m  [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 8 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▋          [0m   2.4 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m           [2m    …[0m  [2msampling…[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.5 GiB[0m  [36m[browser][0m[2m 388 MiB[0m  [37m[terminal][0m[2m 296 MiB[0m  [37m[app][0m[2m 121 MiB[0m  [2m[other][0m[2m 72 MiB[0m  [32m[la[0m[2m…[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▉           [0m  ~1.2 GiB [2m    …[0m  dwm                 [2m[desktop][0m [2m  pid 2592[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~378 MiB [2m    …[0m  chrome              [36m[browser][0m [2m  pid 23104[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~296 MiB [2m    …[0m  WindowsTerminal     [37m[terminal][0m[2m  pid 20628[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~69 MiB [2m    …[0m  explorer            [2m[desktop][0m [2m  pid 9884[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~66 MiB [2m    …[0m  Slack               [37m[app][0m     [2m  pid 27952[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~52 MiB [2m    …[0m  SnippingTool        [2m[other][0m   [2m  pid 14708[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~42 MiB [2m    …[0m  Microsoft.CmdPal.UI [2m[desktop][0m [2m  pid 16932[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~39 MiB [2m    …[0m  msedgewebview2      [37m[app][0m     [2m  pid 18128[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~36 MiB [2m    …[0m  PowerToys           [2m[desktop][0m [2m  pid 18732[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~30 MiB [2m    …[0m  WidgetBoard         [2m[desktop][0m [2m  pid 15832[0m[K
+[2m└──── [0m             [2m  187 MiB[0m        [2m+ 26 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m     8 KiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m           [2m    …[0m  [2msampling…[0m[K
+[2m└──── [0m             [2m    8 KiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[2m~[0m[2m shared[0m[2m memory[0m[2m scaled[0m[2m to[0m[2m fit[0m[2m the[0m[2m adapter:[0m[2m Windows[0m[2m counts[0m[2m pages[0m[2m several[0m[2m processes[0m[2m map[0m[2m once[0m[2m per[0m[K
+[2mprocess.[0m[K
+[J[34F[1mYour[0m[1m NVIDIA[0m[1m RTX[0m[1m 5060[0m[1m is[0m[1m 42%[0m[1m busy[0m[1m —[0m[1m almost[0m[1m all[0m[1m of[0m[1m it[0m[1m is[0m[1m a[0m[1m virtual[0m[1m machine[0m[1m (WSL).[0m[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 15:48:54[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[K
+[2m mem[0m  [38;5;179;48;5;236m████        [0m   2.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;179;48;5;236m█████▏      [0m             42%  [2m3d 42% · copy 1%[0m[K
+[2m tags[0m [35m[vm][0m[2m 2.6 GiB 42%[0m  [2m[system][0m[2m 4 MiB 0%[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   42%  vmwp[35m (WSL2 VM)[0m      [35m[vm][0m      [2m  pid 21712[0m[K
+[2m│  ├─ [0m[38;5;179;48;5;236m█████▏      [0m           [2m  42%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mcopy[0m[K
+[2m│  └─ [0m             [2m   80 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System              [2m[system][0m  [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 9 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▋          [0m   2.5 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m███▉        [0m             32%  [2m3d 32% · videodecode 15% · videoprocessing 1%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.6 GiB 4%[0m  [36m[browser][0m[2m 437 MiB 15%[0m  [37m[terminal][0m[2m 295 MiB 12%[0m  [37m[app][0m[2m 121 MiB 0%[0m  [2m[othe[0m[2m…[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▉           [0m  ~1.3 GiB    4%  dwm                 [2m[desktop][0m [2m  pid 2592[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▍           [0m           [2m 3.5%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~427 MiB   15%  chrome              [36m[browser][0m [2m  pid 23104[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▉          [0m           [2m  15%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▊          [0m           [2m  15%[0m  [2mvideodecode[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mvideoprocessing[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~295 MiB   12%  WindowsTerminal     [37m[terminal][0m[2m  pid 20628[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m█▌          [0m           [2m  12%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~69 MiB    0%  explorer            [2m[desktop][0m [2m  pid 9884[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m            [0m           [2m 0.1%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~66 MiB    0%  Slack               [37m[app][0m     [2m  pid 27952[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~52 MiB    0%  SnippingTool        [2m[other][0m   [2m  pid 14708[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~42 MiB    0%  Microsoft.CmdPal.UI [2m[desktop][0m [2m  pid 16932[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~39 MiB    0%  msedgewebview2      [37m[app][0m     [2m  pid 18128[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~36 MiB    0%  PowerToys           [2m[desktop][0m [2m  pid 18732[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~30 MiB    0%  WidgetBoard         [2m[desktop][0m [2m  pid 15832[0m[K
+[2m└──── [0m             [2m  189 MiB[0m        [2m+ 26 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m     8 KiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m└──── [0m             [2m    8 KiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[2m~[0m[2m shared[0m[2m memory[0m[2m scaled[0m[2m to[0m[2m fit[0m[2m the[0m[2m adapter:[0m[2m Windows[0m[2m counts[0m[2m pages[0m[2m several[0m[2m processes[0m[2m map[0m[2m once[0m[2m per[0m[K
+[2mprocess.[0m[K
+[J[42F[1mYour[0m[1m NVIDIA[0m[1m RTX[0m[1m 5060[0m[1m is[0m[1m 42%[0m[1m busy[0m[1m —[0m[1m almost[0m[1m all[0m[1m of[0m[1m it[0m[1m is[0m[1m a[0m[1m virtual[0m[1m machine[0m[1m (WSL).[0m[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 15:48:54[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[2m  71°C · 30 W[0m[K
+[2m mem[0m  [38;5;179;48;5;236m████        [0m   2.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;179;48;5;236m█████▏      [0m             42%  [2m3d 42% · copy 1%[0m[K
+[2m tags[0m [35m[vm][0m[2m 2.6 GiB 42%[0m  [2m[system][0m[2m 4 MiB 0%[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   42%  vmwp[35m (WSL2 VM)[0m      [35m[vm][0m      [2m  pid 21712[0m[K
+[2m│  ├─ [0m[38;5;179;48;5;236m█████▏      [0m           [2m  42%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mcopy[0m[K
+[2m│  └─ [0m             [2m   80 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System              [2m[system][0m  [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 9 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▋          [0m   2.5 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m███▉        [0m             32%  [2m3d 32% · videodecode 15% · videoprocessing 1%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.6 GiB 4%[0m  [36m[browser][0m[2m 437 MiB 15%[0m  [37m[terminal][0m[2m 295 MiB 12%[0m  [37m[app][0m[2m 121 MiB 0%[0m  [2m[othe[0m[2m…[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▉           [0m  ~1.3 GiB    4%  dwm                 [2m[desktop][0m [2m  pid 2592[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▍           [0m           [2m 3.5%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~427 MiB   15%  chrome              [36m[browser][0m [2m  pid 23104[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▉          [0m           [2m  15%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▊          [0m           [2m  15%[0m  [2mvideodecode[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mvideoprocessing[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~295 MiB   12%  WindowsTerminal     [37m[terminal][0m[2m  pid 20628[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m█▌          [0m           [2m  12%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~69 MiB    0%  explorer            [2m[desktop][0m [2m  pid 9884[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m            [0m           [2m 0.1%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~66 MiB    0%  Slack               [37m[app][0m     [2m  pid 27952[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~52 MiB    0%  SnippingTool        [2m[other][0m   [2m  pid 14708[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~42 MiB    0%  Microsoft.CmdPal.UI [2m[desktop][0m [2m  pid 16932[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~39 MiB    0%  msedgewebview2      [37m[app][0m     [2m  pid 18128[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~36 MiB    0%  PowerToys           [2m[desktop][0m [2m  pid 18732[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~30 MiB    0%  WidgetBoard         [2m[desktop][0m [2m  pid 15832[0m[K
+[2m└──── [0m             [2m  189 MiB[0m        [2m+ 26 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m     8 KiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m└──── [0m             [2m    8 KiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[2m~[0m[2m shared[0m[2m memory[0m[2m scaled[0m[2m to[0m[2m fit[0m[2m the[0m[2m adapter:[0m[2m Windows[0m[2m counts[0m[2m pages[0m[2m several[0m[2m processes[0m[2m map[0m[2m once[0m[2m per[0m[K
+[2mprocess.[0m[K
+[J[42F[1mYour[0m[1m NVIDIA[0m[1m RTX[0m[1m 5060[0m[1m is[0m[1m 42%[0m[1m busy[0m[1m —[0m[1m almost[0m[1m all[0m[1m of[0m[1m it[0m[1m is[0m[1m a[0m[1m training[0m[1m run[0m[1m (train[0m[1m bd1-walk-flat,[0m[1m WSL).[0m[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 15:48:54[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[2m  71°C · 30 W[0m[K
+[2m mem[0m  [38;5;179;48;5;236m████        [0m   2.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;179;48;5;236m█████▏      [0m             42%  [2m3d 42% · copy 1%[0m[K
+[2m tags[0m [1;31m[training][0m[2m 2.6 GiB 42%[0m  [2m[system][0m[2m 4 MiB 0%[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   42%  vmwp[35m (WSL2 VM)[0m                            [1;31m[training][0m[2m  pid 21712[0m[K
+[2m│  ├─ [0m[38;5;179;48;5;236m█████▏      [0m           [2m  42%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mcopy[0m[K
+[2m│  ├─ [0m             [2m  2.7 GiB[0m        [1mtrain bd1-walk-flat[0m[2m  (microduck_rl)[0m       [1;31m[training][0m[2m  pid 1194[0m[K
+[2m│  └─ [0m             [2m   80 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System                                    [2m[system][0m  [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 9 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▋          [0m   2.5 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m███▉        [0m             32%  [2m3d 32% · videodecode 15% · videoprocessing 1%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.6 GiB 4%[0m  [36m[browser][0m[2m 437 MiB 15%[0m  [37m[terminal][0m[2m 295 MiB 12%[0m  [37m[app][0m[2m 121 MiB 0%[0m  [2m[othe[0m[2m…[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▉           [0m  ~1.3 GiB    4%  dwm                                       [2m[desktop][0m [2m  pid 2592[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▍           [0m           [2m 3.5%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~427 MiB   15%  chrome                                    [36m[browser][0m [2m  pid 23104[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▉          [0m           [2m  15%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▊          [0m           [2m  15%[0m  [2mvideodecode[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mvideoprocessing[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~295 MiB   12%  WindowsTerminal                           [37m[terminal][0m[2m  pid 20628[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m█▌          [0m           [2m  12%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~69 MiB    0%  explorer                                  [2m[desktop][0m [2m  pid 9884[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m            [0m           [2m 0.1%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~66 MiB    0%  Slack                                     [37m[app][0m     [2m  pid 27952[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~52 MiB    0%  SnippingTool                              [2m[other][0m   [2m  pid 14708[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~42 MiB    0%  Microsoft.CmdPal.UI                       [2m[desktop][0m [2m  pid 16932[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~39 MiB    0%  msedgewebview2                            [37m[app][0m     [2m  pid 18128[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~36 MiB    0%  PowerToys                                 [2m[desktop][0m [2m  pid 18732[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~30 MiB    0%  WidgetBoard                               [2m[desktop][0m [2m  pid 15832[0m[K
+[2m└──── [0m             [2m  189 MiB[0m        [2m+ 26 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m     8 KiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m└──── [0m             [2m    8 KiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[K
+[2mWSL[0m[2m rows:[0m[2m Linux[0m[2m processes[0m[2m holding[0m[2m /dev/dxg[0m[2m (host[0m[2m RAM[0m[2m shown).[0m[2m They[0m[2m share[0m[2m one[0m[2m VM,[0m[2m so[0m[2m their[0m[2m GPU[0m[2m %[0m[2m is[0m[K
+[2mthe[0m[2m VM's[0m[2m total.[0m[K
+[2m~[0m[2m shared[0m[2m memory[0m[2m scaled[0m[2m to[0m[2m fit[0m[2m the[0m[2m adapter:[0m[2m Windows[0m[2m counts[0m[2m pages[0m[2m several[0m[2m processes[0m[2m map[0m[2m once[0m[2m per[0m[K
+[2mprocess.[0m[K
+[J[46F[1mYour[0m[1m NVIDIA[0m[1m RTX[0m[1m 5060[0m[1m is[0m[1m 42%[0m[1m busy[0m[1m —[0m[1m almost[0m[1m all[0m[1m of[0m[1m it[0m[1m is[0m[1m a[0m[1m training[0m[1m run[0m[1m (train[0m[1m bd1-walk-flat,[0m[1m WSL).[0m[K
+[2m·[0m[2m jev[0m[2m (+3[0m[2m tags)[0m[K
+[1mgputree[0m[2m  3 adapters · ranked by vram · 15:48:54[0m[K
+[K
+[1;36mNVIDIA GeForce RTX 5060 Laptop GPU[0m[2m  71°C · 30 W[0m[K
+[2m mem[0m  [38;5;179;48;5;236m████        [0m   2.6 GiB        [2mof 7.7 GiB[0m[K
+[2m util[0m [38;5;179;48;5;236m█████▏      [0m             42%  [2m3d 42% · copy 1%[0m[K
+[2m tags[0m [1;31m[training][0m[2m 2.6 GiB 42%[0m  [2m[system][0m[2m 4 MiB 0%[0m[K
+[2m├──── [0m[38;5;179;48;5;236m████        [0m   2.6 GiB   42%  vmwp[35m (WSL2 VM)[0m                            [1;31m[training][0m[2m  pid 21712[0m[K
+[2m│  ├─ [0m[38;5;179;48;5;236m█████▏      [0m           [2m  42%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mcopy[0m[K
+[2m│  ├─ [0m             [2m  2.7 GiB[0m        [1mtrain bd1-walk-flat[0m[2m  (microduck_rl)[0m       [1;31m[training][0m[2m  pid 1194[0m[K
+[2m│  └─ [0m             [2m   80 MiB[0m        [2m+ spilled to shared memory[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m     4 MiB    0%  System                                    [2m[system][0m  [2m  pid 4[0m[K
+[2m└──── [0m             [2m  780 KiB[0m        [2m+ 9 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) Graphics[0m[K
+[2m mem[0m  [38;5;108;48;5;236m█▋          [0m   2.5 GiB        [2mof 17.9 GiB shared[0m[K
+[2m util[0m [38;5;108;48;5;236m███▉        [0m             32%  [2m3d 32% · videodecode 15% · videoprocessing 1%[0m[K
+[2m tags[0m [2m[desktop][0m[2m 1.6 GiB 4%[0m  [36m[browser][0m[2m 437 MiB 15%[0m  [37m[terminal][0m[2m 306 MiB 12%[0m  [37m[app][0m[2m 131 MiB 0%[0m  [32m[laun[0m[2m…[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▉           [0m  ~1.3 GiB    4%  dwm                                       [2m[desktop][0m [2m  pid 2592[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▍           [0m           [2m 3.5%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~427 MiB   15%  chrome                                    [36m[browser][0m [2m  pid 23104[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▉          [0m           [2m  15%[0m  [2m3d[0m[K
+[2m│  ├─ [0m[38;5;108;48;5;236m█▊          [0m           [2m  15%[0m  [2mvideodecode[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m▏           [0m           [2m 0.6%[0m  [2mvideoprocessing[0m[K
+[2m├──── [0m[38;5;108;48;5;236m▎           [0m  ~295 MiB   12%  WindowsTerminal                           [37m[terminal][0m[2m  pid 20628[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m█▌          [0m           [2m  12%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~69 MiB    0%  explorer                                  [2m[desktop][0m [2m  pid 9884[0m[K
+[2m│  └─ [0m[38;5;108;48;5;236m            [0m           [2m 0.1%[0m  [2m3d[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~66 MiB    0%  Slack                                     [37m[app][0m     [2m  pid 27952[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~52 MiB    0%  SnippingTool                              [2m[desktop]*[0m[2m  pid 14708[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~42 MiB    0%  Microsoft.CmdPal.UI                       [2m[desktop][0m [2m  pid 16932[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~39 MiB    0%  msedgewebview2                            [37m[app][0m     [2m  pid 18128[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~36 MiB    0%  PowerToys                                 [2m[desktop][0m [2m  pid 18732[0m[K
+[2m├──── [0m[38;5;108;48;5;236m            [0m   ~30 MiB    0%  WidgetBoard                               [2m[desktop][0m [2m  pid 15832[0m[K
+[2m└──── [0m             [2m  189 MiB[0m        [2m+ 26 more processes (--all to list)[0m[K
+[K
+[1;36mIntel(R) AI Boost[0m[K
+[2m mem[0m  [38;5;108;48;5;236m            [0m     8 KiB        [2mcompute accelerator[0m[K
+[2m util[0m [38;5;108;48;5;236m            [0m              0%[K
+[2m└──── [0m             [2m    8 KiB[0m        [2m+ 3 more processes (--all to list)[0m[K
+[K
+[2mWSL[0m[2m rows:[0m[2m Linux[0m[2m processes[0m[2m holding[0m[2m /dev/dxg[0m[2m (host[0m[2m RAM[0m[2m shown).[0m[2m They[0m[2m share[0m[2m one[0m[2m VM,[0m[2m so[0m[2m their[0m[2m GPU[0m[2m %[0m[2m is[0m[K
+[2mthe[0m[2m VM's[0m[2m total.[0m[K
+[2m~[0m[2m shared[0m[2m memory[0m[2m scaled[0m[2m to[0m[2m fit[0m[2m the[0m[2m adapter:[0m[2m Windows[0m[2m counts[0m[2m pages[0m[2m several[0m[2m processes[0m[2m map[0m[2m once[0m[2m per[0m[K
+[2mprocess.[0m[K
+[2m* tag chosen by Jev[0m[K
+[J
