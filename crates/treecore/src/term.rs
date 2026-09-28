@@ -272,6 +272,40 @@ pub fn shade(c: u8) -> u8 {
     }
 }
 
+/// Samples a --watch trail keeps.
+pub const TRAIL: usize = 12;
+
+/// A --watch trail: the last `TRAIL` samples (percent, oldest first) as a sparkline,
+/// always `TRAIL` columns (empty slots on the left while it fills, so nothing after it
+/// moves). The older half is drawn faint so it reads as history fading out.
+pub fn trail(hist: &[f64]) -> Line {
+    const V: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    let h = &hist[hist.len().saturating_sub(TRAIL)..];
+    let mut l = Line::new();
+    l.plain(" ".repeat(TRAIL - h.len()));
+    for (i, &v) in h.iter().enumerate() {
+        let k = ((v / 100.0) * 8.0).ceil().clamp(1.0, 8.0) as usize - 1;
+        let age = h.len() - 1 - i; // 0 = newest
+        let sgr = if !color_on() {
+            String::new()
+        } else if age >= TRAIL / 2 {
+            format!("2;{}", level_sgr(v / 100.0, false))
+        } else {
+            level_sgr(v / 100.0, false)
+        };
+        l.push(&sgr, V[k].to_string());
+    }
+    // merge same-style runs
+    let mut out = Line::new();
+    for s in l.segs {
+        match out.segs.last_mut() {
+            Some(p) if p.sgr == s.sgr => p.text.push_str(&s.text),
+            _ => out.segs.push(s),
+        }
+    }
+    out
+}
+
 /// "2.9 / 17.9 GiB": used and total in the total's unit.
 pub fn fmt_pair(used: f64, total: f64) -> String {
     const K: f64 = 1024.0;
@@ -376,5 +410,26 @@ impl Painter {
         let mut out = std::io::stdout().lock();
         let _ = out.write_all(o.as_bytes());
         let _ = out.flush();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trail_is_always_the_same_width() {
+        for n in [0, 1, 5, TRAIL, TRAIL + 7] {
+            let h: Vec<f64> = (0..n).map(|i| (i * 9 % 101) as f64).collect();
+            assert_eq!(trail(&h).width(), TRAIL, "{n} samples");
+        }
+    }
+
+    #[test]
+    fn stacked_parts_fill_exactly_the_bar() {
+        for w in [12, 30, 48] {
+            let l = stacked(&[(0.31, 167), (0.004, 71), (0.2, crate::tags::FILL_REST)], w);
+            assert_eq!(l.width(), w);
+        }
     }
 }

@@ -65,6 +65,8 @@ pub struct Gpu {
     pub eng: BTreeMap<String, f64>,
     pub procs: Vec<Proc>,
     pub nv: Option<NvStats>,
+    /// --watch: util of the previous frames, oldest first (None when not watching)
+    pub hist: Option<Vec<f64>>,
 }
 
 impl Gpu {
@@ -100,6 +102,25 @@ pub struct Inputs {
     /// process name (lowercase) -> tag chosen by Jev
     pub jev_tags: HashMap<String, &'static str>,
     pub time: String,
+    /// --watch: util history per adapter LUID (None when not watching)
+    pub hist: Option<HashMap<u64, Vec<f64>>>,
+}
+
+impl Inputs {
+    /// --watch: remember this frame's util for each adapter's trail.
+    pub fn push_hist(&mut self) {
+        if self.hist.is_none() || !self.raw.util_ready {
+            return;
+        }
+        let s = build(self);
+        let h = self.hist.as_mut().unwrap();
+        for g in &s.gpus {
+            let v = h.entry(g.luid).or_default();
+            v.push(g.util);
+            let n = v.len().saturating_sub(crate::term::TRAIL);
+            v.drain(..n);
+        }
+    }
 }
 
 pub fn short_name(name: &str, integrated: bool, npu: bool) -> String {
@@ -193,7 +214,7 @@ pub fn build(inp: &Inputs) -> Snap {
                 (mem, cap) = (u, t);
             }
         }
-        let g = Gpu { luid: l, short: short_name(&name, integrated, npu), name, integrated, npu, mem, cap, util, eng, procs: mine, nv };
+        let g = Gpu { luid: l, short: short_name(&name, integrated, npu), name, integrated, npu, mem, cap, util, eng, procs: mine, nv, hist: inp.hist.as_ref().map(|h| h.get(&l).cloned().unwrap_or_default()) };
         if !g.procs.is_empty() || g.mem > 0.0 {
             gpus.push(g);
         }

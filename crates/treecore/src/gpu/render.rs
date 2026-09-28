@@ -6,7 +6,7 @@ use super::headline;
 use super::model::{Gpu, Proc, Snap, TagGroup, WslProc, by_tag, is_active, sort_procs};
 use crate::layout::{BAR, DIM, Headline, Out, Row, layout};
 use crate::tags;
-use crate::term::{Line, bar, color_on, fmt_bytes, fmt_pair, shade};
+use crate::term::{Line, bar, color_on, fmt_bytes, fmt_pair, shade, trail};
 
 const MEM: usize = 9;
 const UTIL: usize = 5;
@@ -245,6 +245,15 @@ impl Ctx<'_> {
             rest,
         });
         let mut rest = Line::new();
+        if let Some(h) = &g.hist {
+            // the trail ends with this frame's value
+            let mut h = h.clone();
+            if self.s.util_ready {
+                h.push(g.util);
+            }
+            rest.append(trail(&h));
+            rest.plain("  ");
+        }
         if self.s.util_ready {
             let mut e: Vec<(&String, &f64)> = g.eng.iter().filter(|(_, v)| **v > 0.05).collect();
             e.sort_by(|x, y| y.1.total_cmp(x.1));
@@ -561,6 +570,7 @@ mod tests {
             eng,
             procs: vec![vm, sys],
             nv: None,
+            hist: None,
         };
         let w = WslProc {
             distro: "Ubuntu-22.04".into(),

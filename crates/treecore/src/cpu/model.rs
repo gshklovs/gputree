@@ -78,6 +78,8 @@ pub struct Snap {
     /// the Linux rows hang under it
     pub vm_host: Option<usize>,
     pub time: String,
+    /// --watch: total CPU of the previous frames, oldest first (None when not watching)
+    pub hist: Option<Vec<f64>>,
 }
 
 #[derive(Default)]
@@ -89,6 +91,8 @@ pub struct Inputs {
     pub wsl: Option<Vec<LinuxProc>>,
     pub jev_tags: HashMap<String, &'static str>,
     pub time: String,
+    /// --watch: total CPU history for the trail (None when not watching)
+    pub hist: Option<Vec<f64>>,
 }
 
 pub fn is_vm(name: &str) -> bool {
@@ -127,6 +131,21 @@ impl Inputs {
         self.time = crate::gpu::sys::local_time();
     }
 
+    /// --watch: remember this frame's total CPU for the trail.
+    pub fn push_hist(&mut self) {
+        if self.hist.is_none() {
+            return;
+        }
+        let s = build(self);
+        if !s.cpu_ready {
+            return;
+        }
+        let h = self.hist.as_mut().unwrap();
+        h.push(s.total);
+        let n = h.len().saturating_sub(crate::term::TRAIL);
+        h.drain(..n);
+    }
+
     /// Image paths for processes not seen before (query-limited handles, read-only).
     pub fn fill_paths(&mut self) {
         let Some(cur) = &self.cur else { return };
@@ -154,6 +173,7 @@ pub fn build(inp: &Inputs) -> Snap {
         wsl: inp.wsl.clone(),
         vm_host: None,
         time: inp.time.clone(),
+        hist: inp.hist.clone(),
     };
     let Some(cur) = &inp.cur else { return snap };
 

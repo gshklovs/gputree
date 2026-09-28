@@ -284,6 +284,7 @@ impl Session {
         }
         draw(self, painter, true);
         mark(self, "final drawn");
+        self.inp.push_hist();
     }
 
     fn pdh_util_ready(&self) -> bool {
@@ -341,6 +342,7 @@ fn main() {
     };
 
     if a.watch > 0.0 {
+        sess.inp.hist = Some(Default::default());
         let mut painter = Some(Painter::new(color, true));
         if tty {
             unsafe {

@@ -12,9 +12,11 @@ use crate::tags;
 use crate::term::{Line, bar, level_sgr, meter, pad_left, stacked, width_of};
 
 pub const BAR: usize = 12;
-/// Widest a summary gauge gets, and the room kept after it for its detail text.
+/// Widest a summary gauge gets, and the room kept after it for its detail text: at
+/// least `METER_REST`, more when a gauge's text is longer (up to `METER_REST_MAX`).
 const METER_MAX: usize = 48;
 const METER_REST: usize = 22;
+const METER_REST_MAX: usize = 40;
 pub const DIM: &str = "2";
 
 /// A styled cell: (text, SGR).
@@ -90,7 +92,13 @@ pub fn layout(out: Vec<Out>, width: usize, cols: &[usize]) -> Vec<Line> {
 
     let meters = || out.iter().filter_map(|o| if let Out::Meter { value, .. } = o { Some(width_of(value)) } else { None });
     let value_w = meters().max().unwrap_or(0);
-    let meter_w = width.saturating_sub(gutter + 1 + value_w + 1 + 4 + 2 + METER_REST).clamp(BAR, METER_MAX);
+    let rest_w = out
+        .iter()
+        .filter_map(|o| if let Out::Meter { rest, .. } = o { Some(rest.width()) } else { None })
+        .max()
+        .unwrap_or(0)
+        .clamp(METER_REST, METER_REST_MAX);
+    let meter_w = width.saturating_sub(gutter + 1 + value_w + 1 + 4 + 2 + rest_w).clamp(BAR, METER_MAX);
 
     let push_cells = |l: &mut Line, cells: &[Cell]| {
         for (i, w) in cols.iter().enumerate() {

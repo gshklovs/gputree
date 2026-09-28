@@ -6,7 +6,7 @@ use super::headline;
 use super::model::{Group, LinuxProc, Snap, by_tag, groups};
 use crate::layout::{Cell, DIM, Headline, Out, Row, blank, cell, child_prefix, layout};
 use crate::tags;
-use crate::term::{Line, color_on, fmt_bytes, fmt_pair, level_fill, shade};
+use crate::term::{Line, color_on, fmt_bytes, fmt_pair, level_fill, shade, trail};
 
 const PCT: usize = 5;
 const MEM: usize = 9;
@@ -252,6 +252,15 @@ pub fn render(s: &Snap, o: &Opts, head: &Headline, width: usize) -> Vec<Line> {
         v
     };
     let mut rest = Line::new();
+    if let Some(h) = &s.hist {
+        // the trail ends with this frame's value
+        let mut h = h.clone();
+        if s.cpu_ready {
+            h.push(s.total);
+        }
+        rest.append(trail(&h));
+        rest.plain("  ");
+    }
     if s.cpu_ready {
         rest.push(DIM, format!("user {} · kernel {}", pct(s.user), pct(s.kernel)));
     } else {
