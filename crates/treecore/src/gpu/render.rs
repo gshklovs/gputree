@@ -3,10 +3,10 @@
 
 use super::Opts;
 use super::headline;
-use super::model::{Gpu, Proc, Snap, TagGroup, by_tag, is_active, sort_procs};
+use super::model::{Gpu, Proc, Snap, TagGroup, WslProc, by_tag, is_active, sort_procs};
 use crate::layout::{BAR, DIM, Headline, Out, Row, layout};
 use crate::tags;
-use crate::term::{Line, bar, color_on, fmt_bytes, fmt_pair};
+use crate::term::{Line, bar, color_on, fmt_bytes, fmt_pair, shade};
 
 const MEM: usize = 9;
 const UTIL: usize = 5;
@@ -57,6 +57,22 @@ impl Ctx<'_> {
             Some(0.0)
         };
         let vm = p.name.eq_ignore_ascii_case("vmwp");
+        // the VM's Linux processes, largest first, each with its colour in the VM's bar
+        let wsl_rows = vm && a.depth >= 2 && (p.util >= 0.5 || p.ded >= 64.0 * 1048576.0);
+        let wsl: Vec<(&WslProc, u8)> = match (&self.s.wsl, wsl_rows) {
+            (Some(w), true) => {
+                let mut w: Vec<&WslProc> = w.iter().collect();
+                w.sort_by(|x, y| y.rss.total_cmp(&x.rss));
+                wsl_colors(&w)
+            }
+            _ => vec![],
+        };
+        // WSL can't see per-process VRAM, so the VM's share is split by RSS (an estimate)
+        let rss: f64 = wsl.iter().map(|(w, _)| w.rss).sum();
+        let split = match frac {
+            Some(f) if !a.metric_util && rss > 0.0 && color_on() => wsl.iter().map(|(w, c)| (f * w.rss / rss, *c)).collect(),
+            _ => vec![],
+        };
         let mut name = Line::new();
         name.plain(p.name.clone());
         if vm {
@@ -71,7 +87,7 @@ impl Ctx<'_> {
             alts: vec![],
             tag: (!a.group).then_some((p.tag, p.jev_tag)),
             pid: format!("pid {}", p.pid),
-            split: vec![],
+            split: split.clone(),
         });
 
         // children: engines, WSL processes, spill note
@@ -96,36 +112,39 @@ impl Ctx<'_> {
                 });
             }
         }
-        if a.depth >= 2 && vm && (p.util >= 0.5 || p.ded >= 64.0 * 1048576.0) {
-            if let Some(wsl) = &self.s.wsl {
-                let mut w: Vec<_> = wsl.iter().collect();
-                w.sort_by(|x, y| y.rss.total_cmp(&x.rss));
-                for w in w {
-                    let mut n = Line::new();
-                    n.push("1", w.label.clone());
-                    n.push(DIM, format!("  {}", w.context()));
-                    kids.push(Row {
-                        prefix: kid_prefix.clone(),
-                        last: false,
-                        bar: None,
-                        cells: vec![(fmt_bytes(w.rss), DIM), (String::new(), "")],
-                        name: n,
-                        alts: {
-                            let mut a1 = Line::new();
-                            a1.push("1", w.label.clone());
-                            if let Some(p) = &w.project {
-                                a1.push(DIM, format!("  ({p})"));
-                            }
-                            let mut a2 = Line::new();
-                            a2.push("1", w.label.clone());
-                            vec![a1, a2]
-                        },
-                        tag: Some((w.tag, false)),
-                        pid: format!("pid {}", w.pid),
-                        split: vec![],
-                    });
+        for &(w, c) in &wsl {
+            // a swatch matching this process's part of the VM's bar
+            let sw = |l: &mut Line| {
+                if !split.is_empty() {
+                    l.push(&format!("38;5;{c}"), "■ ");
                 }
-            }
+            };
+            let mut n = Line::new();
+            sw(&mut n);
+            n.push("1", w.label.clone());
+            n.push(DIM, format!("  {}", w.context()));
+            kids.push(Row {
+                prefix: kid_prefix.clone(),
+                last: false,
+                bar: None,
+                cells: vec![(fmt_bytes(w.rss), DIM), (String::new(), "")],
+                name: n,
+                alts: {
+                    let mut a1 = Line::new();
+                    sw(&mut a1);
+                    a1.push("1", w.label.clone());
+                    if let Some(p) = &w.project {
+                        a1.push(DIM, format!("  ({p})"));
+                    }
+                    let mut a2 = Line::new();
+                    sw(&mut a2);
+                    a2.push("1", w.label.clone());
+                    vec![a1, a2]
+                },
+                tag: Some((w.tag, false)),
+                pid: format!("pid {}", w.pid),
+                split: vec![],
+            });
         }
         if self.spill && a.depth >= 3 && !g.integrated && p.shr >= 1048576.0 {
             let mut n = Line::new();
@@ -407,6 +426,20 @@ fn collapsed(s: &Snap, a: &Opts, g: &Gpu) -> bool {
     !a.all && secondary(g) && g.util < IDLE_UTIL && s.gpus.iter().any(|d| !secondary(d))
 }
 
+/// Each Linux process's colour: its tag's fill, alternating with a darker shade when
+/// neighbours share a tag so they stay apart in the bar.
+fn wsl_colors<'a>(w: &[&'a WslProc]) -> Vec<(&'a WslProc, u8)> {
+    let mut seen: Vec<&str> = vec![];
+    w.iter()
+        .map(|p| {
+            let n = seen.iter().filter(|t| **t == p.tag).count();
+            seen.push(p.tag);
+            let c = tags::fill(p.tag);
+            (*p, if n % 2 == 1 { shade(c) } else { c })
+        })
+        .collect()
+}
+
 /// The memory gauge split by tag, largest first; what no process accounts for
 /// (driver, other sessions) is drawn after them in a neutral grey.
 fn mem_parts(g: &Gpu, groups: &[TagGroup]) -> Vec<(f64, u8)> {
@@ -478,7 +511,7 @@ fn render_with(s: &Snap, a: &Opts, head: &Headline, width: usize, budget: &Budge
     if budget.notes && s.wsl.as_ref().is_some_and(|w| !w.is_empty()) {
         cx.out.push(Out::Free(Line::new()));
         let mut f = Line::new();
-        f.push(DIM, "WSL rows: Linux processes holding /dev/dxg (host RAM shown). They share one VM, so their GPU % is the VM's total.");
+        f.push(DIM, "WSL rows: Linux processes holding /dev/dxg (host RAM shown). They share one VM, so their GPU % is the VM's total; the VM's VRAM bar is split between them by RSS, an estimate (WSL can't see per-process VRAM).");
         cx.out.push(Out::Wrap(f));
     }
     if budget.notes && s.gpus.iter().any(|g| g.integrated && g.procs.iter().any(|p| p.adjusted)) {
@@ -606,6 +639,31 @@ mod tests {
         assert_eq!(seg("55% busy"), "1");
         assert_eq!(seg("a training run (train bd1-walk-flat, WSL)"), crate::tags::color("training"));
         assert_eq!(seg("Your"), "");
+    }
+
+    #[test]
+    fn vm_bar_is_split_between_its_linux_processes() {
+        let mut s = fixture();
+        let mut tb = s.wsl.as_ref().unwrap()[0].clone();
+        tb.pid = 5100;
+        tb.rss = 0.9e9;
+        tb.label = "tensorboard".into();
+        tb.tag = "training";
+        s.wsl.as_mut().unwrap().push(tb);
+        let lines = render(&s, &args(), &local_headline(&s), 110);
+        if let Some(path) = std::env::var_os("GPUTREE_FIXTURE_ANSI") {
+            let text: Vec<String> = lines.iter().map(|l| l.render(true)).collect();
+            std::fs::write(path, text.join("\n")).unwrap();
+        }
+        let vm = lines.iter().find(|l| l.render(false).contains("vmwp")).unwrap();
+        // two Linux processes of the same tag: the tag's fill, then its darker shade
+        let (a, b) = (tags::fill("training"), shade(tags::fill("training")));
+        assert!(vm.segs.iter().any(|g| g.sgr.contains(&format!("38;5;{a}"))), "{vm:?}");
+        assert!(vm.segs.iter().any(|g| g.sgr.contains(&format!("5;{b}"))), "{vm:?}");
+        // and each child row carries the matching swatch
+        let tbl = lines.iter().find(|l| l.render(false).contains("tensorboard")).unwrap();
+        assert!(tbl.segs.iter().any(|g| g.text == "■ " && g.sgr == format!("38;5;{b}")), "{tbl:?}");
+        assert!(lines.iter().all(|l| l.width() <= 110));
     }
 
     #[test]
